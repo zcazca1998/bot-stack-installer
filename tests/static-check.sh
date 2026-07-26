@@ -116,7 +116,11 @@ grep -q '回退官方 PyPI' "$ROOT/modules/astrbot.sh"
 # One-line bootstrap installer, mirror-aware and region-aware.
 [[ -f "$ROOT/bootstrap.sh" ]]
 grep -q 'NBOT_ARGS:-install-all' "$ROOT/bootstrap.sh"
-grep -q '/dev/tty' "$ROOT/bootstrap.sh"
+# /dev/tty may exist yet be unopenable (CI, containers, cron): probe by
+# actually opening it, and fall back to a real unattended run.
+grep -q 'exec 3</dev/tty' "$ROOT/bootstrap.sh"
+grep -q 'NBOT_NONINTERACTIVE=1 "$TARGET/install.sh"' "$ROOT/bootstrap.sh"
+! grep -q '\[\[ -e /dev/tty \]\]' "$ROOT/bootstrap.sh"
 grep -q 'api.github.com' "$ROOT/bootstrap.sh"
 grep -q 'gh-proxy.com' "$ROOT/bootstrap.sh"
 grep -q 'NBOT_REPO:-' "$ROOT/bootstrap.sh"

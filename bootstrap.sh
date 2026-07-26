@@ -80,9 +80,10 @@ tar -C "$work/src" -cf - . | tar -C "$TARGET" -xf -
 chmod 0755 "$TARGET/install.sh"
 
 info "源码已就绪：$TARGET"
-# 通过 </dev/tty 恢复交互：管道执行时 stdin 是脚本本身。
-if [[ -e /dev/tty ]]; then
+# 管道执行时 stdin 是脚本本身，需要 </dev/tty 才能提问。/dev/tty 在
+# CI、容器和 cron 里可能存在却打不开，所以必须实际尝试打开而不是判断节点。
+if [[ "${NBOT_NONINTERACTIVE:-0}" != 1 ]] && (exec 3</dev/tty) 2>/dev/null; then
   exec "$TARGET/install.sh" ${NBOT_ARGS:-install-all} </dev/tty
 fi
-warn "没有可用终端，改为静默安装全部组件（全部使用默认配置）。"
-exec "$TARGET/install.sh" ${NBOT_ARGS:-install-all}
+info "没有可用终端，改为无人值守安装（全部使用默认值或已有配置）。"
+exec env NBOT_NONINTERACTIVE=1 "$TARGET/install.sh" ${NBOT_ARGS:-install-all} </dev/null
