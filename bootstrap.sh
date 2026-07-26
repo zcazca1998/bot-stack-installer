@@ -7,12 +7,13 @@
 #   curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
 #
 # 环境变量：
+#   NBOT_REPO          仓库 owner/name，默认 zcazca1998/nbot（fork 可覆盖）
 #   NBOT_REPO_MIRRORS  逗号分隔的 GitHub 加速站，按序尝试（默认内置三个）
 #   NBOT_BRANCH        分支，默认 main
 #   NBOT_ARGS          传给安装器的参数，默认 install-all；设为 menu 进入菜单
 set -Eeuo pipefail
 
-REPO_PATH=zcazca1998/nbot
+REPO_PATH=${NBOT_REPO:-zcazca1998/nbot}
 BRANCH=${NBOT_BRANCH:-main}
 TARGET=/usr/local/lib/nbot/installer
 MIRRORS=${NBOT_REPO_MIRRORS:-https://gh-proxy.com,https://ghfast.top,https://ghproxy.net}

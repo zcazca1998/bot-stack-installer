@@ -119,6 +119,10 @@ grep -q 'NBOT_ARGS:-install-all' "$ROOT/bootstrap.sh"
 grep -q '/dev/tty' "$ROOT/bootstrap.sh"
 grep -q 'api.github.com' "$ROOT/bootstrap.sh"
 grep -q 'gh-proxy.com' "$ROOT/bootstrap.sh"
+grep -q 'NBOT_REPO:-' "$ROOT/bootstrap.sh"
+# The documented one-liner itself must be covered by CI.
+grep -q 'bootstrap-e2e:' "$ROOT/.github/workflows/ci.yml"
+grep -q 'curl -fsSL' "$ROOT/.github/workflows/ci.yml"
 # Region detection plus numbered mirror menus with a custom-entry escape hatch.
 grep -q 'detect_network_region()' "$ROOT/lib/common-base.sh"
 grep -q 'pick_option()' "$ROOT/lib/common-base.sh"

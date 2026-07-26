@@ -72,6 +72,53 @@ jobs:
         if: failure()
         run: sudo journalctl -u nbot-astrbot.service -n 200 --no-pager || true
 
+  bootstrap-e2e:
+    # 真跑新用户的第一条命令：curl | sudo bash，不预先检出仓库。
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Point data roots at /mnt before bootstrapping
+        run: |
+          sudo tee /etc/nbot.conf >/dev/null <<'EOF'
+          NBOT_HOME=/mnt/nbot
+          ASTRBOT_ROOT=/mnt/nbot/astrbot
+          SNOWLUMA_ROOT=/mnt/nbot/snowluma
+          SNOWLUMA_PAYLOAD_ROOT=/mnt/nbot/payload/snowluma
+          EOF
+          sudo chmod 600 /etc/nbot.conf
+      - name: Install via the documented one-liner
+        env:
+          NBOT_BRANCH: ${{ github.head_ref || github.ref_name }}
+        run: |
+          # 走文档里的直连版本（runner 在海外，加速站反而慢）；
+          # NBOT_ARGS 限定为 install-astrbot，避免在此任务里重复拆镜像。
+          curl -fsSL \
+            "https://raw.githubusercontent.com/${{ github.repository }}/${NBOT_BRANCH}/bootstrap.sh" \
+            | sudo NBOT_ARGS=install-astrbot NBOT_BRANCH="$NBOT_BRANCH" \
+                   NBOT_REPO="${{ github.repository }}" bash
+      - name: Verify bootstrap outcome
+        run: |
+          # 引导脚本应当落地安装器、注册 nbot 命令并真正装好 AstrBot。
+          test -x /usr/local/sbin/nbot
+          test -f /usr/local/lib/nbot/installer/install.sh
+          systemctl is-active nbot-astrbot.service
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:6185/; then exit 0; fi
+            sleep 2
+          done
+          echo 'WebUI did not answer within 60s' >&2
+          exit 1
+      - name: nbot help and status through the installed command
+        run: |
+          sudo nbot help
+          sudo nbot status
+          sudo nbot doctor
+      - name: Logs on failure
+        if: failure()
+        run: |
+          sudo journalctl -u nbot-astrbot.service -n 200 --no-pager || true
+          ls -la /usr/local/lib/nbot/installer 2>/dev/null || true
+
   full-stack:
     if: github.event_name == 'workflow_dispatch' && inputs.full_stack
     runs-on: ubuntu-latest
