@@ -142,7 +142,7 @@ install_snowluma() {
   local build oci bundle rootfs snow_version qq_version release_id snow_release qq_release
   local old_app old_qq free_kb start_failed=0 required_kb=6291456
 
-  install_packages ca-certificates curl jq openssl skopeo umoci libcap2-bin xvfb dbus-user-session ffmpeg xdotool zbar-tools qrencode fonts-wqy-zenhei libasound2 libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 procps util-linux xauth xdg-utils
+  install_packages ca-certificates curl jq openssl skopeo umoci libcap2-bin xvfb dbus-user-session ffmpeg xdotool zbar-tools qrencode imagemagick fonts-wqy-zenhei libasound2 libatspi2.0-0 libgbm1 libgtk-3-0 libnotify4 libnss3 libsecret-1-0 procps util-linux xauth xdg-utils
   require_commands curl jq skopeo umoci setcap Xvfb xauth mcookie dbus-daemon ffmpeg xdotool zbarimg qrencode
   mkdir -p "$SNOWLUMA_ROOT" "$SNOWLUMA_PAYLOAD_ROOT"
   free_kb=$(df -Pk "$SNOWLUMA_PAYLOAD_ROOT" | awk 'NR==2 {print $4}')

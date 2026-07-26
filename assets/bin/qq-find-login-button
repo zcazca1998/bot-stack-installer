@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# 视觉定位快捷登录按钮：截取登录窗口，找出品牌蓝的水平色带，
+# 输出窗口内相对坐标 "X Y"。找不到时返回非零，由调用方回退比例估算。
+# 不依赖固定窗口尺寸或 UI 布局，QQ 改版后依然可用。
+set -Eeuo pipefail
+
+display=${1:?display}
+auth=${2:?xauthority}
+win_x=${3:?window x}
+win_y=${4:?window y}
+win_w=${5:?window width}
+win_h=${6:?window height}
+
+command -v convert >/dev/null 2>&1 || exit 3
+shot=$(mktemp /dev/shm/qqbtn.XXXXXX.png)
+txt=$(mktemp /dev/shm/qqbtn.XXXXXX.txt)
+trap 'rm -f "$shot" "$txt"' EXIT
+
+DISPLAY="$display" XAUTHORITY="$auth" ffmpeg -hide_banner -loglevel error -y \
+  -f x11grab -video_size "${win_w}x${win_h}" -i "${display}+${win_x},${win_y}" \
+  -frames:v 1 "$shot" 2>/dev/null || exit 3
+
+# 逐像素导出后交给 awk：找蓝色像素（b 明显高于 r/g）最长水平游程所在的
+# 连续色带，取其质心。按钮是登录页唯一的大块纯蓝区域。
+convert "$shot" -depth 8 txt:- > "$txt" 2>/dev/null || exit 3
+
+awk -F'[,:] *' '
+/^[0-9]/ {
+  x = $1; y = $2
+  if (match($0, /#([0-9A-Fa-f]{6})/)) {
+    hex = substr($0, RSTART + 1, 6)
+    r = strtonum("0x" substr(hex, 1, 2))
+    g = strtonum("0x" substr(hex, 3, 2))
+    b = strtonum("0x" substr(hex, 5, 2))
+    if (b > 180 && b - r > 50 && b - g > 30) {
+      count[y]++
+      sumx[y] += x
+      if (!(y in miny)) miny[y] = 1
+    }
+  }
+}
+END {
+  # 只保留水平蓝色像素数达到窗口宽度 25% 的行，视为按钮所在行
+  min_run = int(W * 0.25)
+  best_y0 = -1
+  for (y = 0; y < H; y++) {
+    if (count[y] >= min_run) {
+      if (start < 0) start = y
+      last = y
+      rows++
+    } else if (start >= 0) {
+      if (rows > best_rows) { best_rows = rows; best_y0 = start; best_y1 = last }
+      start = -1; rows = 0
+    }
+  }
+  if (start >= 0 && rows > best_rows) { best_rows = rows; best_y0 = start; best_y1 = last }
+  # 高度过小的色带（分隔线、图标描边）不是按钮
+  if (best_y0 < 0 || best_rows < 12) exit 1
+  cy = int((best_y0 + best_y1) / 2)
+  cx = int(sumx[cy] / count[cy])
+  printf "%d %d\n", cx, cy
+}
+' W="$win_w" H="$win_h" start=-1 rows=0 best_rows=0 "$txt"

@@ -41,20 +41,40 @@ while (( $(date +%s) < deadline )); do
   window=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null | tail -1 || true)
   [[ -n "$window" ]] || { sleep 2; continue; }
   geometry=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$window" 2>/dev/null || true)
+  win_x=$(sed -n 's/^X=//p' <<<"$geometry")
+  win_y=$(sed -n 's/^Y=//p' <<<"$geometry")
   width=$(sed -n 's/^WIDTH=//p' <<<"$geometry")
   height=$(sed -n 's/^HEIGHT=//p' <<<"$geometry")
+  [[ "$win_x" =~ ^[0-9]+$ && "$win_y" =~ ^[0-9]+$ ]] || { sleep 2; continue; }
   [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]] || { sleep 2; continue; }
   # 自适应：登录窗口按尺寸范围识别（与 qqlogin 一致），点击位置按比例换算。
   # 高度 71% 即 320x460 布局中的快捷登录按钮；8 秒无反应换 66% 再试一次。
   ((width >= 260 && width <= 520 && height >= 340 && height <= 650)) || { sleep 2; continue; }
-  case $attempts in
-    0) y=$((height * 71 / 100)) ;;
-    1) y=$((height * 66 / 100)) ;;
-    *) break ;;
-  esac
-  DISPLAY="$display" XAUTHORITY="$auth" xdotool mousemove --window "$window" $((width / 2)) "$y" click 1
+  # 优先视觉定位：找到登录按钮的蓝色色带质心，不依赖固定尺寸或布局。
+  x= y= how=
+  if spot=$(/usr/local/lib/bot-stack/qq-find-login-button "$display" "$auth" \
+              "$win_x" "$win_y" "$width" "$height" 2>/dev/null); then
+    read -r x y <<<"$spot"
+    how=visual
+  fi
+  if [[ -z "${x:-}" || -z "${y:-}" ]]; then
+    case $attempts in
+      0) x=$((width / 2)); y=$((height * 71 / 100)); how=ratio-71 ;;
+      1) x=$((width / 2)); y=$((height * 66 / 100)); how=ratio-66 ;;
+      *) break ;;
+    esac
+  elif ((attempts >= 2)); then
+    break
+  fi
+  # Electron 只在窗口获得焦点后才处理合成的点击；先激活再按压。
+  DISPLAY="$display" XAUTHORITY="$auth" xdotool windowactivate --sync "$window" 2>/dev/null || true
+  DISPLAY="$display" XAUTHORITY="$auth" xdotool mousemove --window "$window" "$x" "$y" 2>/dev/null || true
+  sleep 0.3
+  DISPLAY="$display" XAUTHORITY="$auth" xdotool mousedown 1 2>/dev/null || true
+  sleep 0.12
+  DISPLAY="$display" XAUTHORITY="$auth" xdotool mouseup 1 2>/dev/null || true
   attempts=$((attempts + 1))
-  logger -t snowluma "QQ quick-login click attempt ${attempts} at $((width / 2)),${y} in ${width}x${height} window"
+  logger -t snowluma "QQ quick-login click attempt ${attempts} (${how}) at ${x},${y} in ${width}x${height} window"
   sleep 8
 done
 

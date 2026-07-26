@@ -29,10 +29,16 @@ grep -q 'qq-auto-login &$' "$ROOT/assets/bin/qq-launch"
 # Login success must also be detected via the main window (login.enc lags).
 grep -q 'main_window_visible' "$ROOT/assets/bin/qqlogin"
 grep -q 'main_window_visible' "$ROOT/assets/bin/qq-auto-login"
-# Quick-login clicks must be proportional with a generous startup budget.
+# Quick-login clicks: visual button detection first, ratio fallback, focus
+# and a real press/release so Electron accepts the synthetic event.
+[[ -f "$ROOT/assets/bin/qq-find-login-button" ]]
+grep -q 'qq-find-login-button' "$ROOT/assets/bin/qq-auto-login"
 grep -q 'height \* 71 / 100' "$ROOT/assets/bin/qq-auto-login"
+grep -q 'windowactivate' "$ROOT/assets/bin/qq-auto-login"
+grep -q 'mousedown 1' "$ROOT/assets/bin/qq-auto-login"
 grep -q '+ 90' "$ROOT/assets/bin/qq-auto-login"
 ! grep -q '160 328' "$ROOT/assets/bin/qq-auto-login"
+grep -q 'imagemagick' "$ROOT/modules/snowluma.sh"
 grep -q 'exec "$executable"' "$ROOT/assets/bin/qq-launch"
 grep -q 'xvfb_ok' "$ROOT/assets/bin/snowluma-healthcheck"
 
