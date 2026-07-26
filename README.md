@@ -83,25 +83,32 @@ noVNC 与 Caddy 另有专属动作：
 
 | 命令 | 说明 |
 | --- | --- |
-| `nbot novnc url` | 显示访问地址 |
-| `nbot novnc password` | 查看 VNC 密码 |
-| `nbot novnc set-password` | 更换 VNC 密码（留空自动生成，改完立即生效） |
+| `nbot novnc url` | 显示可直接打开的完整访问地址 |
+| `nbot novnc password` | 查看 VNC 密码（仅未装反代时使用） |
+| `nbot novnc set-password` | 更换 VNC 密码（仅未装反代时使用） |
 | `nbot novnc proxy-example` | 打印 Nginx / Caddy 反代配置示例 |
 | `nbot caddy set-auth` | 更换网页登录账号 / 密码 |
 | `nbot caddy status` | Caddy 运行状态 |
 | `nbot caddy logs` | Caddy 日志 |
+| `nbot astrbot webui` | 显示 AstrBot WebUI 地址与默认账号 |
+| `nbot snowluma webui` | 显示 SnowLuma WebUI 地址与访问令牌 |
 
 ### 凭据一览
 
 | 凭据 | 安装时 | 之后 |
 | --- | --- | --- |
+| **网页登录（Caddy）** | 账号默认 `admin`，密码可自填或随机生成 | `nbot caddy set-auth` 更换；只存 bcrypt 哈希，无法查看 |
 | AstrBot WebUI | 固定 `astrbot` / `astrbot` | 在 WebUI 内自行修改 |
-| VNC 密码 | 自动生成并显示，**无需自己想** | `nbot novnc password` 查看，`set-password` 更换 |
-| Caddy 网页登录 | 安装时可自填，留空则随机生成 | 只存 bcrypt 哈希，**无法查看**，用 `nbot caddy set-auth` 重设 |
+| SnowLuma WebUI | 令牌由 SnowLuma 自己生成 | `nbot snowluma webui` 自动读出带令牌的完整地址 |
 | OneBot token | `configure-onebot` 时显示 | 可从 SnowLuma 配置文件读取 |
 
-安装全程**只需要输入一次密码**（Caddy 的网页登录），VNC 密码一律自动生成——
-它上限只有 8 位、又被 Caddy 挡在内网后面，让用户单独记一个没有意义。
+**装了 Caddy 之后 noVNC 没有单独的密码**：访问必经 Caddy 的账号密码，
+而 noVNC 与 VNC 端口都只监听回环，回环上再加一道 VNC 密码不增加安全性，
+只让人多记一个凭据。所以 x11vnc 以 `-nopw` 运行，`nbot novnc url` 给出的
+链接点开就能用，改密码只需 `nbot caddy set-auth` 一处。
+
+没装反向代理时才会启用 VNC 密码（避免裸奔），此时可用
+`nbot novnc password` 查看、`nbot novnc set-password` 更换。
 
 ### 状态与诊断
 

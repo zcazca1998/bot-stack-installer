@@ -204,6 +204,17 @@ grep -q 'set-password)' "$ROOT/install-core.sh"
 grep -q 'set-auth|set-password)' "$ROOT/install-core.sh"
 # Reinstalling must not invalidate an existing VNC password.
 grep -q '已有密码保持不变' "$ROOT/modules/novnc.sh"
+# Access info must be a ready-to-open URL once Caddy fronts noVNC, and the
+# SnowLuma token must be surfaced instead of leaving users to grep the journal.
+grep -q 'show_novnc_access()' "$ROOT/modules/novnc.sh"
+grep -q 'autoconnect=1' "$ROOT/modules/novnc.sh"
+# One credential set only: with Caddy in front, x11vnc runs with -nopw so the
+# user never juggles a second password for a loopback-only port.
+grep -q 'nopw' "$ROOT/assets/bin/vnc-server-launch"
+grep -q 'novnc_fronted_by_caddy()' "$ROOT/modules/novnc.sh"
+grep -q 'show_novnc_access' "$ROOT/modules/caddy.sh"
+grep -q 'snowluma_webui_token()' "$ROOT/modules/snowluma.sh"
+grep -q 'show_snowluma_webui' "$ROOT/install-core.sh"
 grep -q 'reverse_proxy 127.0.0.1' "$ROOT/modules/caddy.sh"
 # IP access sends no SNI; an explicit self-signed cert must be used.
 grep -q 'novnc-selfsigned' "$ROOT/modules/caddy.sh"

@@ -211,10 +211,10 @@ install_caddy() {
         -u "${CADDY_AUTH_USER}:${pw}" "https://127.0.0.1:${CADDY_HTTPS_PORT}/novnc/vnc.html" || true)
       [[ "$code" == 200 ]] || warn "带凭据访问预期 200，实际得到 ${code:-无响应}。"
     fi
-    info "访问：https://服务器IP:${CADDY_HTTPS_PORT}/novnc/vnc.html（自签名证书，浏览器首次需确认例外）"
+    show_novnc_access
   else
     info "请确认 ${CADDY_DOMAIN} 已解析到本机，且 80/443 对外可达；证书会自动签发。"
-    info "访问：https://${CADDY_DOMAIN}/novnc/vnc.html"
+    show_novnc_access
   fi
   [[ -z "$shown_pw" ]] || info "登录账号：${CADDY_AUTH_USER}  密码：${shown_pw}（请立即保存，仅显示这一次）"
   info "如有防火墙或云安全组，请放行 ${CADDY_DOMAIN:+80/443}${CADDY_DOMAIN:-${CADDY_HTTPS_PORT}} 端口。"

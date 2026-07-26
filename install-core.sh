@@ -157,7 +157,7 @@ print_summary() {
   ip=${ip:-服务器IP}
   bold "安装完成"
   info "AstrBot WebUI:  http://${ip}:${ASTRBOT_PORT}（默认账号/密码 astrbot/astrbot，请尽快修改）"
-  info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}"
+  show_snowluma_webui
   info "下一步："
   info "  1) nbot login                  # 扫码登录 QQ"
   info "  2) nbot configure-onebot       # 生成 OneBot 配置并显示 token"
@@ -294,6 +294,16 @@ service_command() {
     set-password)
       [[ "$group" == novnc ]] || die "仅 novnc 支持 set-password"
       set_vnc_password ;;
+    webui)
+      case "$group" in
+        snowluma) show_snowluma_webui ;;
+        novnc) show_novnc_access ;;
+        astrbot)
+          local ip
+          ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+          info "AstrBot WebUI: http://${ip:-服务器IP}:${ASTRBOT_PORT}（astrbot / astrbot）" ;;
+        *) die "$group 没有 WebUI" ;;
+      esac ;;
     url)
       [[ "$group" == novnc ]] || die "仅 novnc 支持 url"
       printf '本机:     http://127.0.0.1:%s/vnc.html\n' "$NOVNC_PORT"
@@ -339,6 +349,7 @@ QQ 登录
       nbot astrbot logs -n 200      查看最近 200 行
       nbot qq restart               重启 QQ（先停 SnowLuma 避免 Hook 悬空）
       nbot snowluma update          重新拆镜像更新 SnowLuma + QQ
+  WebUI 地址：nbot astrbot webui | snowluma webui | novnc url
   noVNC 专属：nbot novnc url | password | set-password | proxy-example
   Caddy：     nbot caddy set-auth | status | restart | logs
 

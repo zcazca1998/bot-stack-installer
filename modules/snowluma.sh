@@ -254,6 +254,37 @@ install_qq() {
   install_snowluma
 }
 
+snowluma_webui_token() {
+  # SnowLuma 自己生成 WebUI token，安装器不参与。优先读它的配置文件，
+  # 读不到再从日志里捞，避免用户自己去爬 journal。
+  local file token
+  for file in "$SNOWLUMA_ROOT"/data/config/webui.json \
+              "$SNOWLUMA_ROOT"/data/config/*webui*.json \
+              "$SNOWLUMA_ROOT"/config/webui.json; do
+    [[ -r "$file" ]] || continue
+    token=$(jq -r '.token // .accessToken // .password // empty' "$file" 2>/dev/null | head -n1)
+    [[ -n "$token" ]] && { printf '%s\n' "$token"; return 0; }
+  done
+  # 日志里通常打印过一次带 token 的访问地址。
+  token=$(journalctl -u nbot-snowluma.service --no-pager 2>/dev/null |
+            grep -oE 'token=[A-Za-z0-9._~-]+' | tail -n1 | cut -d= -f2)
+  [[ -n "$token" ]] && { printf '%s\n' "$token"; return 0; }
+  return 1
+}
+
+show_snowluma_webui() {
+  local ip token
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  ip=${ip:-服务器IP}
+  if token=$(snowluma_webui_token); then
+    info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}/?token=${token}"
+    info "  访问令牌：${token}（nbot snowluma webui 可再次查看）"
+  else
+    info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}"
+    warn "未能自动读取 SnowLuma 访问令牌，可执行：nbot snowluma logs -n 200 | grep -i token"
+  fi
+}
+
 configure_onebot() {
   local uin token
   [[ -f "$SNOWLUMA_ROOT/app/index.mjs" ]] || die "Install SnowLuma first."

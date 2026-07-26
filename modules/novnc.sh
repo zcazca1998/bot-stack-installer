@@ -49,6 +49,34 @@ EOF
 
 vnc_password_file() { printf '%s/config/vnc-password\n' "$SNOWLUMA_ROOT"; }
 
+novnc_fronted_by_caddy() {
+  [[ -f /etc/systemd/system/caddy.service && -f "$CADDY_CONF_DIR/conf.d/novnc.caddy" ]]
+}
+
+show_novnc_access() {
+  # 鉴权统一由 Caddy 承担：只有一套账号密码，链接点开就能用。
+  local ip url
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  ip=${ip:-服务器IP}
+
+  bold "noVNC 访问地址"
+  if novnc_fronted_by_caddy; then
+    if [[ -n "$CADDY_DOMAIN" ]]; then
+      url="https://${CADDY_DOMAIN}"
+    else
+      url="https://${ip}:${CADDY_HTTPS_PORT}"
+    fi
+    info "${url}/novnc/vnc.html?autoconnect=1&resize=scale"
+    info "登录账号：${CADDY_AUTH_USER}（密码用 nbot caddy set-auth 更换）"
+    [[ -n "$CADDY_DOMAIN" ]] ||
+      info "自签名证书，浏览器首次会提示不安全，确认例外即可。"
+  else
+    info "http://127.0.0.1:${NOVNC_PORT}/vnc.html（仅监听回环，需自行反代或端口转发）"
+    info "VNC 密码：$(head -n1 "$(vnc_password_file)" 2>/dev/null || echo 未设置)"
+    info "建议执行 nbot install-caddy，由 Caddy 提供 HTTPS 与登录鉴权。"
+  fi
+}
+
 write_vnc_password() {
   # x11vnc 的 -passwdfile 只读第一行明文，VNC 协议本身没有账号概念；
   # 账号密码那一层由 Caddy 的 basic_auth 承担。
@@ -65,6 +93,11 @@ set_vnc_password() {
   file=$(vnc_password_file)
   [[ -f /etc/systemd/system/nbot-vnc.service ]] ||
     die "尚未安装 noVNC，请先执行 nbot install-novnc。"
+  if novnc_fronted_by_caddy; then
+    warn "已由 Caddy 承担鉴权，VNC 密码层处于关闭状态，改它不影响访问。"
+    warn "要更换网页登录凭据请执行：nbot caddy set-auth"
+    nbot_interactive && { confirm "仍要设置 VNC 密码（仅在移除 Caddy 后生效）？" N || return 0; }
+  fi
   if nbot_interactive; then
     read -r -s -p '新的 VNC 密码（留空自动生成，VNC 协议上限 8 位有效）: ' password; echo
     if [[ -n "$password" ]]; then
@@ -128,15 +161,17 @@ install_novnc() {
     die "noVNC web 服务启动失败。"
   fi
 
-  info "noVNC 已就绪：http://127.0.0.1:${NOVNC_PORT}/vnc.html（仅监听本机）"
-  info "VNC 密码（自动生成，无需记）：$(<"$passwd_file")"
-  info "  随时查看：nbot novnc password    需要更换：nbot novnc set-password"
-  info "反向代理示例：/usr/local/lib/nbot/novnc-proxy.example（nbot novnc proxy-example 查看）"
-  warn "noVNC 可完全操作 QQ 会话，务必在反向代理上叠加 HTTPS 与鉴权后再暴露。"
+  info "noVNC 服务已就绪（仅监听 127.0.0.1:${NOVNC_PORT}）。"
+  warn "noVNC 可完全操作 QQ 会话，必须由反向代理提供 HTTPS 与登录鉴权后再暴露。"
 
-  if confirm "现在让安装器接管 Caddy（自动安装并生成 HTTPS + 登录配置）吗？" Y; then
+  if confirm "现在让安装器接管 Caddy（自动配置 HTTPS + 登录，之后直接点链接访问）？" Y; then
     install_caddy
   else
     info "之后可随时执行：nbot install-caddy"
+  fi
+  # 装完 Caddy 再输出访问信息，这样能直接给出可点击的完整地址。
+  show_novnc_access
+  if ! novnc_fronted_by_caddy; then
+    info "VNC 密码：nbot novnc password 查看，nbot novnc set-password 更换"
   fi
 }
