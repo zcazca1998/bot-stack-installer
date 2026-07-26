@@ -4,6 +4,7 @@ source /etc/bot-stack.conf
 cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
 deadline=$(( $(date +%s) + 90 ))
 attempts=0
+visual_misses=0
 
 resolve_xvfb() {
   display= auth=
@@ -57,6 +58,13 @@ while (( $(date +%s) < deadline )); do
     read -r x y <<<"$spot"
     how=visual
   fi
+  # QQ 冷启动时窗口先是空白/加载态，按钮尚未渲染。给视觉定位留出
+  # 重试窗口，不要立刻退化成比例估算。
+  if [[ -z "${x:-}" ]] && ((visual_misses < 10)); then
+    visual_misses=$((visual_misses + 1))
+    sleep 2
+    continue
+  fi
   if [[ -z "${x:-}" || -z "${y:-}" ]]; then
     case $attempts in
       0) x=$((width / 2)); y=$((height * 71 / 100)); how=ratio-71 ;;
@@ -74,7 +82,7 @@ while (( $(date +%s) < deadline )); do
   sleep 0.12
   DISPLAY="$display" XAUTHORITY="$auth" xdotool mouseup 1 2>/dev/null || true
   attempts=$((attempts + 1))
-  logger -t snowluma "QQ quick-login click attempt ${attempts} (${how}) at ${x},${y} in ${width}x${height} window"
+  logger -t snowluma "QQ quick-login click attempt ${attempts} (${how}, visual-misses=${visual_misses}) at ${x},${y} in ${width}x${height} window"
   sleep 8
 done
 
