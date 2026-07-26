@@ -212,12 +212,12 @@ install_snowluma() {
   systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
   systemctl daemon-reload
   systemctl enable nbot-qq.service nbot-snowluma.service nbot-snowluma-watchdog.timer >/dev/null
-  systemctl start nbot-qq.service || start_failed=1
+  start_service nbot-qq.service || start_failed=1
   if ((start_failed == 0)); then
-    systemctl start nbot-snowluma.service || start_failed=1
+    start_service nbot-snowluma.service || start_failed=1
   fi
   if ((start_failed == 0)); then
-    systemctl start nbot-snowluma-watchdog.timer || start_failed=1
+    start_service nbot-snowluma-watchdog.timer || start_failed=1
   fi
   sleep 8
 
@@ -228,7 +228,7 @@ install_snowluma() {
     systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
     if [[ -n "$old_app" ]]; then atomic_symlink "$old_app" "$SNOWLUMA_ROOT/app"; else rm -f "$SNOWLUMA_ROOT/app"; fi
     if [[ -n "$old_qq" ]]; then atomic_symlink "$old_qq" "$SNOWLUMA_ROOT/qq/current"; else rm -f "$SNOWLUMA_ROOT/qq/current"; fi
-    systemctl start nbot-qq.service nbot-snowluma.service 2>/dev/null || true
+    start_service nbot-qq.service nbot-snowluma.service 2>/dev/null || true
     journalctl -u nbot-qq.service -u nbot-snowluma.service -n 120 --no-pager
     die "SnowLuma image extraction installed but runtime verification failed."
   fi
@@ -300,16 +300,16 @@ rollback_snowluma() {
   systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
   atomic_symlink "$snow_target" "$SNOWLUMA_ROOT/app"
   [[ -z "$qq_target" ]] || atomic_symlink "$qq_target" "$SNOWLUMA_ROOT/qq/current"
-  systemctl start nbot-qq.service || true
-  systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
+  start_service nbot-qq.service || true
+  systemctl reset-failed nbot-snowluma.service 2>/dev/null || true; systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
   sleep 8
   if ! systemctl is-active --quiet nbot-qq.service; then
     warn "回滚后的版本未能启动，正在切回原版本。"
     systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
     atomic_symlink "$old_app" "$SNOWLUMA_ROOT/app"
     [[ -z "$old_qq" ]] || atomic_symlink "$old_qq" "$SNOWLUMA_ROOT/qq/current"
-    systemctl start nbot-qq.service 2>/dev/null || true
-    systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
+    start_service nbot-qq.service 2>/dev/null || true
+    systemctl reset-failed nbot-snowluma.service 2>/dev/null || true; systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
     die "回滚失败，已恢复到 $(basename "$old_app")。"
   fi
   info "已回滚到 $(basename "$snow_target")。再次执行 nbot snowluma rollback 可切回。"
@@ -380,7 +380,7 @@ Environment=SNOWLUMA_WEBUI_BOOTSTRAP_PASSWORD=%s
     systemctl daemon-reload
   fi
 
-  systemctl start nbot-snowluma.service
+  start_service nbot-snowluma.service
   sleep 8
   # 指定密码只在首次生成时被读取，用完即清，避免长期把明文留在 unit 里。
   if [[ -n "$password" ]]; then
@@ -419,7 +419,7 @@ configure_onebot() {
     ONEBOT_HTTP_PORT=$ONEBOT_HTTP_PORT ASTRBOT_WS_PORT=$ASTRBOT_WS_PORT \
     "$SNOWLUMA_PAYLOAD_ROOT/runtime/node" \
     /usr/local/lib/nbot/write-onebot-config
-  systemctl restart nbot-snowluma.service
+  restart_service nbot-snowluma.service
   info "OneBot configured: HTTP 127.0.0.1:${ONEBOT_HTTP_PORT}; WS -> 127.0.0.1:${ASTRBOT_WS_PORT}/ws"
   info "OneBot token：${token}"
   info "在 AstrBot WebUI 添加 OneBot v11 适配器时填写：端口 ${ASTRBOT_WS_PORT}，token 如上。"

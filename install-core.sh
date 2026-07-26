@@ -484,7 +484,7 @@ main() {
       case "${2:-}" in
         set-auth|set-password) set_caddy_auth ;;
         status) systemctl status caddy.service --no-pager -l ;;
-        restart) systemctl restart caddy.service ;;
+        restart) restart_service caddy.service ;;
         logs) journalctl -u caddy.service --no-pager ;;
         *) die "用法: nbot caddy {set-auth|status|restart|logs}" ;;
       esac

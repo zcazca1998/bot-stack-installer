@@ -140,7 +140,7 @@ set_caddy_auth() {
   caddy validate --config "$CADDY_CONF_DIR/Caddyfile" >/dev/null 2>&1 ||
     die "Caddyfile 校验失败，配置未生效。"
   systemctl reload caddy.service 2>/dev/null ||
-    systemctl restart caddy.service
+    restart_service caddy.service
   info "登录账号：${CADDY_AUTH_USER}  密码：${password}"
   warn "密码仅显示这一次，请立即保存。"
 }
@@ -191,11 +191,11 @@ install_caddy() {
   fi
 
   systemctl enable caddy.service >/dev/null
-  systemctl restart caddy.service
+  restart_service caddy.service
   # VNC 桥接在启动时决定是否启用 VNC 密码；它先于 Caddy 启动，所以必须在
   # 这里重启一次，否则会一直沿用「无反代」时的 -passwdfile 判断。
   if systemctl is-active --quiet nbot-vnc.service; then
-    systemctl restart nbot-vnc.service
+    restart_service nbot-vnc.service
   fi
   sleep 2
   if ! systemctl is-active --quiet caddy.service; then

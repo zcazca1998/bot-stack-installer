@@ -23,8 +23,16 @@ done
 # 看门狗必须与 systemd 对齐：failed 时不介入。
 grep -q 'failed.*systemd gave up' "$ROOT/assets/bin/snowluma-healthcheck"
 grep -q 'failed.*systemd gave up' "$ROOT/assets/bin/astrbot-healthcheck"
-# 触顶后手动启动会被拒，控制命令要替用户 reset-failed。
+# 触顶后手动启动会被拒。安装、更新、回滚、改密码都会主动停启服务，这些
+# 不是崩溃却同样计入配额，必须统一走会先 reset-failed 的 helper，否则
+# 「更新两次再回滚」这种正常操作就会撞上 start-limit-hit。
 grep -q 'systemctl reset-failed' "$ROOT/install-core.sh"
+grep -q '^start_service()' "$ROOT/lib/common-base.sh"
+grep -q '^restart_service()' "$ROOT/lib/common-base.sh"
+for module in astrbot snowluma novnc caddy; do
+  ! grep -qE '^[[:space:]]*systemctl (start|restart) nbot-' "$ROOT/modules/${module}.sh" ||
+    { echo "modules/${module}.sh 仍有绕过 reset-failed 的直接启动" >&2; exit 1; }
+done
 grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-snowluma.service"
 grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-qq.service"
 ! grep -R -q '^Restart=always$' "$ROOT/assets/systemd"
@@ -229,7 +237,7 @@ grep -q 'nopw' "$ROOT/assets/bin/vnc-server-launch"
 grep -q 'novnc_fronted_by_caddy()' "$ROOT/modules/novnc.sh"
 # The bridge decides at startup whether a VNC password is needed, and it starts
 # before Caddy: installing Caddy must restart it or the stale decision sticks.
-grep -q 'systemctl restart nbot-vnc.service' "$ROOT/modules/caddy.sh"
+grep -q 'restart_service nbot-vnc.service' "$ROOT/modules/caddy.sh"
 grep -q 'After=nbot-qq.service caddy.service' "$ROOT/assets/systemd/nbot-vnc.service"
 grep -q 'show_novnc_access' "$ROOT/modules/caddy.sh"
 grep -q 'show_snowluma_webui' "$ROOT/install-core.sh"

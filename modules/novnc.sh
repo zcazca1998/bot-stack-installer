@@ -116,7 +116,7 @@ set_vnc_password() {
     warn "VNC 协议只使用前 8 位字符，超出部分会被忽略。"
   write_vnc_password "$password"
   if systemctl is-active --quiet nbot-vnc.service; then
-    systemctl restart nbot-vnc.service
+    restart_service nbot-vnc.service
     info "VNC 桥接已重启，新密码立即生效。"
   else
     info "VNC 桥接当前未运行，新密码将在下次启动时生效。"
@@ -149,9 +149,9 @@ install_novnc() {
   install_novnc_units
   write_novnc_proxy_example
   systemctl enable nbot-vnc.service nbot-novnc.service >/dev/null
-  systemctl restart nbot-novnc.service
+  restart_service nbot-novnc.service
   if systemctl is-active --quiet nbot-qq.service; then
-    systemctl restart nbot-vnc.service
+    restart_service nbot-vnc.service
   else
     info "nbot-qq.service 未运行；VNC 桥接会随 QQ 服务一起启动。"
   fi

@@ -523,6 +523,19 @@ SystemMaxUse=${JOURNALD_MAX_USE}"
   fi
 }
 
+start_service() {
+  # 安装、更新、回滚、改密码都会主动停启服务，这些不是「反复崩溃」，
+  # 却同样计入 StartLimitBurst。不先清计数的话，连续两次更新再加一次回滚
+  # 就会撞上 start-limit-hit，让正常操作失败。
+  systemctl reset-failed "$@" 2>/dev/null || true
+  systemctl start "$@"
+}
+
+restart_service() {
+  systemctl reset-failed "$@" 2>/dev/null || true
+  systemctl restart "$@"
+}
+
 wait_http() {
   local url=$1 attempts=${2:-30}
   while ((attempts-- > 0)); do

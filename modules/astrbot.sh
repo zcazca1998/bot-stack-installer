@@ -86,7 +86,7 @@ install_astrbot() {
   systemctl enable nbot-astrbot.service nbot-astrbot-watchdog.timer >/dev/null
   # A start failure must fall through to the rollback below, not kill the
   # script via set -e before it can restore the previous version.
-  systemctl start nbot-astrbot.service nbot-astrbot-watchdog.timer || true
+  start_service nbot-astrbot.service nbot-astrbot-watchdog.timer || true
   sleep 5
   if ! systemctl is-active --quiet nbot-astrbot.service; then
     warn "新版本未能启动，正在回滚。"
@@ -94,7 +94,7 @@ install_astrbot() {
     rm -rf "$ASTRBOT_ROOT/app" "$ASTRBOT_ROOT/.venv"
     [[ ! -d "$old_app" ]] || mv "$old_app" "$ASTRBOT_ROOT/app"
     [[ ! -d "$old_venv" ]] || mv "$old_venv" "$ASTRBOT_ROOT/.venv"
-    systemctl start nbot-astrbot.service 2>/dev/null || true
+    start_service nbot-astrbot.service 2>/dev/null || true
     journalctl -u nbot-astrbot.service -n 80 --no-pager
     die "AstrBot 更新失败，已尝试恢复旧版本。"
   fi
@@ -149,7 +149,7 @@ rollback_astrbot() {
   mv "$ASTRBOT_ROOT/.app.swap" "$prev_app"
   mv "$ASTRBOT_ROOT/.venv.swap" "$prev_venv"
 
-  systemctl start nbot-astrbot.service || true
+  start_service nbot-astrbot.service || true
   sleep 5
   if ! systemctl is-active --quiet nbot-astrbot.service; then
     journalctl -u nbot-astrbot.service -n 40 --no-pager
@@ -161,7 +161,7 @@ rollback_astrbot() {
     mv "$prev_venv" "$ASTRBOT_ROOT/.venv"
     mv "$ASTRBOT_ROOT/.app.swap" "$prev_app"
     mv "$ASTRBOT_ROOT/.venv.swap" "$prev_venv"
-    systemctl start nbot-astrbot.service 2>/dev/null || true
+    start_service nbot-astrbot.service 2>/dev/null || true
     die "回滚失败，已恢复到 ${current}。"
   fi
   info "已回滚到 ${previous}。再次执行 nbot astrbot rollback 可切回 ${current}。"
@@ -216,7 +216,7 @@ set_astrbot_password() {
       printf 'Environment=ASTRBOT_DASHBOARD_INITIAL_PASSWORD=%s\n' "$password"
   } > /etc/systemd/system/nbot-astrbot.service.d/reset-password.conf
   systemctl daemon-reload
-  systemctl start nbot-astrbot.service
+  start_service nbot-astrbot.service
 
   # 复位是一次性动作，用完立刻移除 drop-in，避免每次重启都重置密码。
   sleep 8
