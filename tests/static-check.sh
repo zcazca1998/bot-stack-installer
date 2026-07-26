@@ -124,6 +124,16 @@ grep -q 'NBOT_NONINTERACTIVE=1 "$TARGET/install.sh"' "$ROOT/bootstrap.sh"
 grep -q 'api.github.com' "$ROOT/bootstrap.sh"
 grep -q 'gh-proxy.com' "$ROOT/bootstrap.sh"
 grep -q 'NBOT_REPO:-' "$ROOT/bootstrap.sh"
+# Preflight checks must happen before downloading anything.
+grep -q 'uname -m' "$ROOT/bootstrap.sh"
+grep -q 'dpkg --print-architecture' "$ROOT/bootstrap.sh"
+grep -q 'command -v apt-get' "$ROOT/bootstrap.sh"
+awk '/^case "\$\(uname -m\)"/ {arch=NR} /^downloaded=0/ {dl=NR} END {exit !(arch && dl && arch < dl)}'   "$ROOT/bootstrap.sh" || { echo 'bootstrap 架构检查必须在下载之前' >&2; exit 1; }
+# A 64-bit kernel with a 32-bit userland must be rejected, not silently broken.
+grep -q 'dpkg --print-architecture' "$ROOT/lib/common-base.sh"
+# doctor reports dependencies, package arch and payload free space.
+grep -q 'PKGARCH' "$ROOT/install-core.sh"
+grep -q '6291456' "$ROOT/install-core.sh"
 # The documented one-liner itself must be covered by CI.
 grep -q 'bootstrap-e2e:' "$ROOT/.github/workflows/ci.yml"
 grep -q 'curl -fsSL' "$ROOT/.github/workflows/ci.yml"

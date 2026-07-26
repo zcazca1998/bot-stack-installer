@@ -87,11 +87,25 @@ require_root() {
 }
 
 detect_arch() {
+  local dpkg_arch
   case "$(uname -m)" in
     x86_64|amd64) SYSTEM_ARCH=amd64; SNOWLUMA_ARCH=x64 ;;
     aarch64|arm64) SYSTEM_ARCH=arm64; SNOWLUMA_ARCH=arm64 ;;
     *) die "不支持的架构：$(uname -m)。仅支持 amd64/x86_64 与 arm64/aarch64。" ;;
   esac
+  # 64 位内核可能跑 32 位用户空间（部分旧 Armbian）：此时 uname 报 aarch64，
+  # 但 apt 只认 armhf，装出来的 64 位载荷跑不起来。以包架构为准。
+  if command -v dpkg >/dev/null 2>&1; then
+    dpkg_arch=$(dpkg --print-architecture 2>/dev/null || true)
+    case "$dpkg_arch" in
+      amd64|arm64)
+        [[ "$dpkg_arch" == "$SYSTEM_ARCH" ]] ||
+          die "内核架构 $(uname -m) 与系统包架构 ${dpkg_arch} 不一致，无法安装。"
+        ;;
+      '') ;;
+      *) die "系统包架构为 ${dpkg_arch}（32 位用户空间），不支持；需要 amd64 或 arm64。" ;;
+    esac
+  fi
   export SYSTEM_ARCH SNOWLUMA_ARCH
 }
 

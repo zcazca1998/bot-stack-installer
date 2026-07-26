@@ -82,7 +82,7 @@ configure_base() {
 }
 
 status_all() {
-  bold "Service status"
+  bold "服务状态"
   local unit
   for unit in nbot-astrbot.service nbot-astrbot-watchdog.timer nbot-qq.service \
     nbot-snowluma.service nbot-snowluma-watchdog.timer nbot-vnc.service \
@@ -96,11 +96,36 @@ status_all() {
 }
 
 doctor() {
-  local failed=0 path
-  bold "Environment diagnostics"
-  printf 'OS:   '; (source /etc/os-release; echo "${PRETTY_NAME:-unknown}")
-  printf 'ARCH: '; uname -m
-  printf 'ROOT: '; findmnt -no SOURCE,FSTYPE,AVAIL / 2>/dev/null || true
+  local failed=0 path free_kb missing=() name
+  bold "环境诊断"
+  printf 'OS:      '; (source /etc/os-release; echo "${PRETTY_NAME:-unknown}")
+  printf 'ARCH:    %s（部署目标 %s，SnowLuma %s）\n' "$(uname -m)" "$SYSTEM_ARCH" "$SNOWLUMA_ARCH"
+  printf 'PKGARCH: %s\n' "$(dpkg --print-architecture 2>/dev/null || echo 未知)"
+  printf 'SYSTEMD: %s\n' "$(systemctl --version 2>/dev/null | head -1 || echo 不可用)"
+  printf 'KERNEL:  %s\n' "$(uname -r)"
+  printf 'MEM:     %s\n' "$(free -h 2>/dev/null | awk 'NR==2 {print $2" total, "$7" available"}' || echo 未知)"
+
+  # 关键命令：缺失说明依赖没装全或 PATH 有问题。
+  for name in curl jq skopeo umoci setcap Xvfb xauth mcookie dbus-daemon \
+              ffmpeg xdotool zbarimg qrencode convert openssl; do
+    command -v "$name" >/dev/null 2>&1 || missing+=("$name")
+  done
+  if ((${#missing[@]})); then
+    warn "缺少命令（SnowLuma/QQ 相关功能会受影响）：${missing[*]}"
+    warn "执行 nbot install-snowluma 或 nbot repair 可补齐。"
+  else
+    printf 'DEPS:    全部关键命令就绪\n'
+  fi
+
+  printf 'ROOT:    '; findmnt -no SOURCE,FSTYPE,AVAIL / 2>/dev/null || true
+  # 载荷目录空间：拆镜像需要 6 GiB，不足会在安装中途失败。
+  if [[ -d "$SNOWLUMA_PAYLOAD_ROOT" ]]; then
+    free_kb=$(df -Pk "$SNOWLUMA_PAYLOAD_ROOT" 2>/dev/null | awk 'NR==2 {print $4}')
+    if [[ "$free_kb" =~ ^[0-9]+$ ]] && ((free_kb < 6291456)); then
+      warn "载荷目录可用空间不足 6 GiB（当前 $((free_kb / 1024)) MiB），拆镜像会失败。"
+      failed=1
+    fi
+  fi
   for path in "$ASTRBOT_ROOT" "$SNOWLUMA_ROOT" "$SNOWLUMA_PAYLOAD_ROOT"; do
     [[ -e "$path" ]] || continue
     printf '%s: ' "$path"
@@ -110,17 +135,17 @@ doctor() {
   status_all
   if systemctl is-active --quiet nbot-astrbot.service &&
      ! curl -fsS --max-time 5 -o /dev/null "http://127.0.0.1:${ASTRBOT_PORT}/"; then
-    warn "AstrBot is active but WebUI ${ASTRBOT_PORT} is not responding."
+    warn "AstrBot 在运行但 WebUI ${ASTRBOT_PORT} 无响应。"
     failed=1
   fi
   if systemctl is-active --quiet nbot-snowluma.service &&
      ! curl -fsS --max-time 5 -o /dev/null "http://127.0.0.1:${SNOWLUMA_WEBUI_PORT}/"; then
-    warn "SnowLuma is active but WebUI ${SNOWLUMA_WEBUI_PORT} is not responding."
+    warn "SnowLuma 在运行但 WebUI ${SNOWLUMA_WEBUI_PORT} 无响应。"
     failed=1
   fi
   if systemctl is-active --quiet nbot-novnc.service &&
      ! curl -fsS --max-time 5 -o /dev/null "http://127.0.0.1:${NOVNC_PORT}/vnc.html"; then
-    warn "noVNC is active but ${NOVNC_PORT} is not responding."
+    warn "noVNC 在运行但 ${NOVNC_PORT} 无响应。"
     failed=1
   fi
   return "$failed"

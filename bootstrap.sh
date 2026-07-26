@@ -22,9 +22,33 @@ info() { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[WARN]\033[0m %s\n' "$*" >&2; }
 die() { printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 
+# 前置检查放在下载之前：不合要求的机器不该先装依赖、拉完源码才报错。
 [[ ${EUID:-$(id -u)} -eq 0 ]] || die "请使用 root 运行：curl -fsSL ... | sudo bash"
 [[ -d /run/systemd/system ]] || die "当前系统不是 systemd，无法安装服务。"
 [[ -r /etc/os-release ]] || die "无法识别 Linux 发行版。"
+
+case "$(uname -m)" in
+  x86_64|amd64|aarch64|arm64) ;;
+  *) die "不支持的架构：$(uname -m)。仅支持 amd64/x86_64 与 arm64/aarch64。" ;;
+esac
+
+# 64 位内核 + 32 位用户空间（部分旧 Armbian）装不了 arm64 包。
+if command -v dpkg >/dev/null 2>&1; then
+  case "$(dpkg --print-architecture 2>/dev/null)" in
+    amd64|arm64) ;;
+    '') ;;
+    *) die "系统包架构为 $(dpkg --print-architecture)，与 64 位运行时不兼容。" ;;
+  esac
+fi
+
+# shellcheck disable=SC1091
+if ! (source /etc/os-release; case "${ID:-}:${ID_LIKE:-}" in
+        debian:*|ubuntu:*|armbian:*|*:debian*|*:ubuntu*) exit 0 ;;
+        *) exit 1 ;;
+      esac); then
+  die "仅支持 Debian、Ubuntu、Armbian 及其衍生版（需要 apt）。"
+fi
+command -v apt-get >/dev/null 2>&1 || die "未找到 apt-get，当前发行版不受支持。"
 
 if ! command -v curl >/dev/null 2>&1 || ! command -v tar >/dev/null 2>&1; then
   info "安装引导依赖：curl tar ca-certificates"
