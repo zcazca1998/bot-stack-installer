@@ -1,0 +1,39 @@
+name: QR Login Debug
+
+# Manual-only: installs the full SnowLuma + QQ stack on the runner, then
+# opens a tmate SSH session so you can run `sudo qqlogin` interactively and
+# scan the QR code rendered in your terminal.
+#
+# Access is limited to the GitHub actor's SSH keys because Actions logs on a
+# public repository are world-readable.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  qr-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Point data roots at /mnt and disable China-facing mirrors
+        run: |
+          sudo tee /etc/bot-stack.conf >/dev/null <<'EOF'
+          ASTRBOT_ROOT=/mnt/AstrBot
+          SNOWLUMA_ROOT=/mnt/snowluma
+          SNOWLUMA_PAYLOAD_ROOT=/mnt/AstrBot/.bot-stack/snowluma
+          SNOWLUMA_IMAGE_MIRROR=
+          SNOWLUMA_IMAGE_FALLBACK_MIRROR=
+          EOF
+          sudo chmod 600 /etc/bot-stack.conf
+      - name: Install SnowLuma + QQ from the official image
+        run: sudo ./install.sh install-snowluma
+      - name: Show stack status
+        run: |
+          systemctl is-active snowluma-qq.service snowluma.service || true
+          sudo /usr/local/lib/bot-stack/qq-status || true
+          echo '连上 SSH 后执行: sudo qqlogin  (终端窗口至少 74 列 x 40 行)'
+      - name: Open SSH session (tmate, actor keys only)
+        uses: mxschmitt/action-tmate@v3
+        with:
+          limit-access-to-actor: true
