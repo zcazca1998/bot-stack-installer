@@ -64,13 +64,59 @@ jobs:
           done
           echo 'WebUI did not answer within 60s' >&2
           exit 1
-      - name: nbot status and doctor
+      - name: nbot status, doctor and webui
         run: |
           sudo nbot status
           sudo nbot doctor
+          # webui 必须报出账号，且不能再宣称固定的 astrbot/astrbot 密码。
+          sudo nbot astrbot webui | tee /tmp/webui.txt
+          grep -q 'AstrBot WebUI' /tmp/webui.txt
+          ! grep -q 'astrbot / astrbot' /tmp/webui.txt
+      - name: Reset the WebUI password with an explicit value
+        run: |
+          sudo NBOT_ASTRBOT_PASSWORD='CiTestPass123' nbot astrbot set-password
+          # 服务必须活着、WebUI 必须还能响应，否则重置就是把用户锁在门外。
+          systemctl is-active nbot-astrbot.service
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:6185/ && break
+            sleep 2
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:6185/
+          # 一次性 drop-in 必须被清理，否则每次重启都会重置密码。
+          test ! -e /etc/systemd/system/nbot-astrbot.service.d/reset-password.conf
+          # 设定的密码必须真能登录，随机的旧密码必须失效。
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"astrbot","password":"CiTestPass123"}' \
+            http://127.0.0.1:6185/api/auth/login)
+          echo "login with new password -> $code"
+          [ "$code" = 200 ]
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"astrbot","password":"definitely-not-the-password"}' \
+            http://127.0.0.1:6185/api/auth/login)
+          echo "login with wrong password -> $code"
+          [ "$code" != 200 ]
+      - name: Reset again without a value, expect a generated password
+        run: |
+          sudo nbot astrbot set-password
+          systemctl is-active nbot-astrbot.service
+          test ! -e /etc/systemd/system/nbot-astrbot.service.d/reset-password.conf
+          # 旧密码必须失效，说明确实重新生成了。
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"username":"astrbot","password":"CiTestPass123"}' \
+            http://127.0.0.1:6185/api/auth/login)
+          echo "old password after regeneration -> $code"
+          [ "$code" != 200 ]
+          # 新的随机密码必须能被 webui 子命令读出来。
+          sudo nbot astrbot webui | tee /tmp/webui2.txt
+          grep -qE '初始密码 \S{8,}' /tmp/webui2.txt
       - name: Logs on failure
         if: failure()
-        run: sudo journalctl -u nbot-astrbot.service -n 200 --no-pager || true
+        run: |
+          sudo journalctl -u nbot-astrbot.service -n 200 --no-pager || true
+          ls -la /etc/systemd/system/nbot-astrbot.service.d 2>/dev/null || true
 
   bootstrap-e2e:
     # 真跑新用户的第一条命令：curl | sudo bash，不预先检出仓库。
@@ -142,6 +188,35 @@ jobs:
         run: |
           systemctl is-active nbot-qq.service nbot-snowluma.service
           sudo /usr/local/lib/nbot/qq-status || true
+          # SnowLuma 用密码登录，没有 token；webui 子命令必须报出 admin 账号。
+          sudo nbot snowluma webui | tee /tmp/sl-webui.txt
+          grep -q 'SnowLuma WebUI' /tmp/sl-webui.txt
+          grep -q 'admin' /tmp/sl-webui.txt
+      - name: Reset the SnowLuma WebUI password
+        run: |
+          auth=/mnt/nbot/snowluma/data/config/webui.json
+          before=$(sudo sha256sum "$auth" 2>/dev/null | awk '{print $1}' || echo none)
+          sudo NBOT_SNOWLUMA_PASSWORD='CiTestPass123!' nbot snowluma set-password
+          systemctl is-active nbot-snowluma.service
+          # 一次性 drop-in 必须清理，否则每次重启都重置密码。
+          test ! -e /etc/systemd/system/nbot-snowluma.service.d/bootstrap-password.conf
+          # 凭据文件必须被重新生成（内容变了），且原文件已备份。
+          after=$(sudo sha256sum "$auth" 2>/dev/null | awk '{print $1}' || echo none)
+          echo "auth hash: $before -> $after"
+          [ "$before" != "$after" ]
+          ls /mnt/nbot/snowluma/data/config/webui.json.bak.* >/dev/null
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:5099/ && break
+            sleep 2
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:5099/
+          # 设定的密码必须真能登录。
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            -H 'Content-Type: application/json' \
+            -d '{"password":"CiTestPass123!"}' \
+            http://127.0.0.1:5099/api/login)
+          echo "snowluma login with new password -> $code"
+          [ "$code" = 200 ]
       - name: Install noVNC (defaults, decline Caddy prompt)
         run: printf '\n\nn\n' | sudo ./install.sh install-novnc
       - name: Install Caddy (self-signed defaults)
@@ -150,6 +225,23 @@ jobs:
         run: |
           code=$(curl -ks -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/novnc/vnc.html)
           [ "$code" = 401 ]
+      - name: Rotate the web login and verify it takes effect
+        run: |
+          sudo NBOT_CADDY_PASSWORD='RotatedPass123' nbot caddy set-auth
+          systemctl is-active caddy.service
+          url=https://127.0.0.1:8443/novnc/vnc.html
+          code=$(curl -ks -o /dev/null -w '%{http_code}' -u 'admin:RotatedPass123' "$url")
+          echo "login with rotated password -> $code"
+          [ "$code" = 200 ]
+          code=$(curl -ks -o /dev/null -w '%{http_code}' -u 'admin:definitely-wrong' "$url")
+          echo "login with wrong password -> $code"
+          [ "$code" = 401 ]
+          # 轮换只改凭据，站点与 TLS 配置必须保持原样。
+          grep -q '^:8443 {' /etc/caddy/conf.d/novnc.caddy
+          grep -q '^    tls ' /etc/caddy/conf.d/novnc.caddy
+          # x11vnc 在 Caddy 之后必须以 -nopw 运行，不再要求第二道密码。
+          pgrep -af x11vnc | tee /tmp/x11vnc.txt || true
+          grep -q -- '-nopw' /tmp/x11vnc.txt
       - name: Logs on failure
         if: failure()
         run: |
