@@ -141,8 +141,10 @@ jobs:
 
           # 3) 起来就崩：试几次后必须停手，停在 failed，看门狗也不介入。
           sudo install -d /etc/systemd/system/nbot-astrbot.service.d
-          { echo '[Service]'; echo 'ExecStartPre='; echo 'ExecStart='
-            echo 'ExecStart=/bin/false'; } |
+          # 用 ExecStartPre 制造启动失败：Type=simple 下 ExecStart=/bin/false
+          # 只要 exec 成功就算启动成功，服务会显示 active 而不是 failed。
+          { echo '[Service]'; echo 'ExecStartPre='
+            echo 'ExecStartPre=/bin/false'; } |
             sudo tee /etc/systemd/system/nbot-astrbot.service.d/break.conf >/dev/null
           sudo systemctl daemon-reload
           sudo systemctl reset-failed nbot-astrbot.service
@@ -154,6 +156,9 @@ jobs:
           done
           echo "always-failing unit -> $state"
           [ "$state" = failed ]
+          # 必须是「试几次后主动放弃」，而不是无限重试到超时。
+          sudo journalctl -u nbot-astrbot.service -n 50 --no-pager | tee /tmp/limit.txt
+          grep -qi 'start request repeated too quickly\|start-limit-hit' /tmp/limit.txt
           # 看门狗在 failed 状态下必须原地不动，且要留下说明。
           sudo systemctl start nbot-astrbot-watchdog.service
           sleep 3
