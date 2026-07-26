@@ -264,6 +264,8 @@ configure_onebot() {
     /usr/local/lib/bot-stack/write-onebot-config
   systemctl restart snowluma.service
   info "OneBot configured: HTTP 127.0.0.1:${ONEBOT_HTTP_PORT}; WS -> 127.0.0.1:${ASTRBOT_WS_PORT}/ws"
+  info "OneBot token：${token}"
+  info "在 AstrBot WebUI 添加 OneBot v11 适配器时填写：端口 ${ASTRBOT_WS_PORT}，token 如上。"
 }
 
 install_snowluma_units() {
