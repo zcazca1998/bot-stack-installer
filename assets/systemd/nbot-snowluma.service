@@ -2,13 +2,21 @@
 Description=SnowLuma OneBot service (extracted official image)
 After=network-online.target nbot-qq.service
 Wants=network-online.target nbot-qq.service
+# 用「活了多久」区分两种失败：跑着跑着崩了（偶发 bug、外部因素）值得拉起，
+# 起来就崩（配置错、端口占用）拉一万次也没用。5 分钟内失败 3 次就停手，
+# 停在 failed 等人处理；用户主动 stop 永远不受影响。
+StartLimitIntervalSec=300
+StartLimitBurst=3
 
 [Service]
 Type=simple
 User=snowluma
 Group=snowluma
 ExecStart=/usr/local/lib/nbot/snowluma-launch
-Restart=on-abnormal
+# 用「活了多久」区分两种失败：跑着跑着崩了（偶发 bug、外部因素）值得拉起，
+# 起来就崩（配置错、端口占用）拉一万次也没用。5 分钟内失败 3 次就停手，
+# 停在 failed 状态等人处理；用户主动 stop 永远不受影响。
+Restart=on-failure
 RestartSec=10
 KillMode=control-group
 KillSignal=SIGTERM

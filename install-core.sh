@@ -83,16 +83,24 @@ configure_base() {
 
 status_all() {
   bold "服务状态"
-  local unit
+  local unit state failed_units=0
   for unit in nbot-astrbot.service nbot-astrbot-watchdog.timer nbot-qq.service \
     nbot-snowluma.service nbot-snowluma-watchdog.timer nbot-vnc.service \
     nbot-novnc.service caddy.service; do
     if systemctl list-unit-files "$unit" --no-legend 2>/dev/null | grep -q .; then
-      printf '%-28s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
+      state=$(systemctl is-active "$unit" 2>/dev/null || true)
+      if [[ "$state" == failed ]]; then
+        printf '%-28s %s（systemd 已停止重试）\n' "$unit" "$state"
+        failed_units=1
+      else
+        printf '%-28s %s\n' "$unit" "$state"
+      fi
     fi
   done
   [[ -x /usr/local/lib/nbot/qq-status ]] &&
     /usr/local/lib/nbot/qq-status || true
+  ((failed_units == 0)) ||
+    warn "有服务处于 failed：短时间内反复启动失败，systemd 已停止重试，看门狗也不会介入。请先查日志排因。"
 }
 
 doctor() {
@@ -256,6 +264,15 @@ service_command() {
       units=(nbot-vnc.service nbot-novnc.service)
       logunits=(-u nbot-vnc.service -u nbot-novnc.service) ;;
     *) die "未知组件：$group（可用：astrbot snowluma qq novnc）" ;;
+  esac
+
+  # 反复失败触顶 StartLimitBurst 后，systemd 会拒绝一切启动请求（包括手动的），
+  # 报 "start request repeated too quickly"。用户不该被这个细节卡住：显式启动
+  # 之前先清掉失败状态，让「我知道问题修好了，现在启动」总能生效。
+  case "$action" in
+    start|restart)
+      systemctl reset-failed "${units[@]}" 2>/dev/null || true
+      ;;
   esac
 
   case "$action" in
@@ -474,6 +491,8 @@ main() {
       ;;
     configure-onebot) configure_onebot ;;
     repair)
+      # 修复的目的就是让服务能起来，所以先清掉之前的失败计数。
+      systemctl reset-failed nbot-astrbot.service nbot-snowluma.service         nbot-qq.service nbot-vnc.service nbot-novnc.service 2>/dev/null || true
       install_runtime_assets
       install_astrbot_units
       install_snowluma_units

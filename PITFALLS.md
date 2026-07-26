@@ -28,10 +28,13 @@
 
 ## systemd 与健康检查
 
-1. Restart=on-failure 会把程序主动报错退出也拉起，不符合当前要求；主服务使用 Restart=on-abnormal。
-2. 进程仍在但 WebUI 或 Hook 连续失败才按假死处理，单次波动不能触发重启。
-3. Hook IPC 丢失优先重启 SnowLuma，避免不必要地重启 QQ。
-4. QQ 掉线无限重启会增加账号风控，只自动恢复一次。
+1. 只用 Restart=on-abnormal 会漏掉「运行中崩溃退出」：进程崩了比假死更严重，反而没人救。改用 on-failure + StartLimitIntervalSec/StartLimitBurst，用存活时长区分「起不来」和「跑着崩了」，前者试几次就停手，后者正常拉起。
+2. StartLimit* 在新版 systemd 属于 [Unit] 段，写进 [Service] 会被静默忽略，限流形同虚设。
+3. 启动配额统计所有启动尝试，包括手动 systemctl restart。触顶后手动启动也会被拒，必须先 reset-failed，所以控制命令要替用户做掉这一步。
+4. 看门狗必须与 systemd 的重启策略对齐：systemd 放弃（failed）后看门狗还去拉，等于绕过限流反复救一个救不活的服务。用户主动 stop（inactive）同样不能介入。
+5. 进程仍在但 WebUI 或 Hook 连续失败才按假死处理，单次波动不能触发重启。
+6. Hook IPC 丢失优先重启 SnowLuma，避免不必要地重启 QQ。
+7. QQ 掉线无限重启会增加账号风控，只自动恢复一次。
 
 ## 登录二维码
 

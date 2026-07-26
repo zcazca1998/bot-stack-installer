@@ -110,6 +110,58 @@ jobs:
           again=$(sudo cat /mnt/nbot/astrbot/app/.nbot-version)
           [ "$again" = "$before" ]
           systemctl is-active nbot-astrbot.service
+      - name: Restart policy matches the watchdog
+        run: |
+          # 1) 用户主动停止：systemd 与看门狗都不能把它拉起来。
+          sudo nbot astrbot stop
+          sudo systemctl start nbot-astrbot-watchdog.service
+          sleep 3
+          state=$(systemctl is-active nbot-astrbot.service || true)
+          echo "after manual stop -> $state"
+          [ "$state" = inactive ]
+          sudo nbot astrbot start
+          systemctl is-active nbot-astrbot.service
+
+          # 2) 被信号杀死（等价于 OOM）：必须自动拉起来。
+          old=$(systemctl show nbot-astrbot.service -p MainPID --value)
+          sudo kill -9 "$old"
+          for _ in $(seq 1 20); do
+            new=$(systemctl show nbot-astrbot.service -p MainPID --value)
+            [ -n "$new" ] && [ "$new" != 0 ] && [ "$new" != "$old" ] && break
+            sleep 2
+          done
+          echo "after SIGKILL: $old -> $new"
+          [ "$new" != "$old" ]
+          systemctl is-active nbot-astrbot.service
+
+          # 3) 起来就崩：试几次后必须停手，停在 failed，看门狗也不介入。
+          sudo install -d /etc/systemd/system/nbot-astrbot.service.d
+          { echo '[Service]'; echo 'ExecStartPre='; echo 'ExecStart='
+            echo 'ExecStart=/bin/false'; } |
+            sudo tee /etc/systemd/system/nbot-astrbot.service.d/break.conf >/dev/null
+          sudo systemctl daemon-reload
+          sudo systemctl reset-failed nbot-astrbot.service
+          sudo systemctl start nbot-astrbot.service || true
+          for _ in $(seq 1 30); do
+            state=$(systemctl is-active nbot-astrbot.service || true)
+            [ "$state" = failed ] && break
+            sleep 2
+          done
+          echo "always-failing unit -> $state"
+          [ "$state" = failed ]
+          # 看门狗在 failed 状态下必须原地不动，且要留下说明。
+          sudo systemctl start nbot-astrbot-watchdog.service
+          sleep 3
+          [ "$(systemctl is-active nbot-astrbot.service || true)" = failed ]
+          sudo journalctl -t nbot-astrbot-watchdog -n 20 --no-pager | tee /tmp/wd.txt
+          grep -q 'systemd gave up' /tmp/wd.txt
+
+          # 4) 修好之后要能正常启动：控制命令替用户清掉失败状态。
+          sudo rm -f /etc/systemd/system/nbot-astrbot.service.d/break.conf
+          sudo rmdir /etc/systemd/system/nbot-astrbot.service.d 2>/dev/null || true
+          sudo systemctl daemon-reload
+          sudo nbot astrbot start
+          systemctl is-active nbot-astrbot.service
       - name: Reset the WebUI password with an explicit value
         run: |
           sudo NBOT_ASTRBOT_PASSWORD='CiTestPass123' nbot astrbot set-password

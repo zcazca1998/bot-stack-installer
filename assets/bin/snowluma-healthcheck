@@ -30,6 +30,16 @@ restart_stack() {
 qq_state=$(systemctl is-active nbot-qq.service 2>/dev/null || true)
 snow_state=$(systemctl is-active nbot-snowluma.service 2>/dev/null || true)
 
+# 与 systemd 的重启策略对齐：unit 用 on-failure + StartLimitBurst，反复起不来
+# 时 systemd 会放弃并停在 failed。此时 watchdog 也必须停手，否则就成了绕过
+# 限流反复拉一个救不活的服务。用户主动 stop（inactive）同样不动作。
+# 两种状态都清掉计数，避免下次正常启动时被陈旧计数误伤。
+if [[ "$qq_state" == failed || "$snow_state" == failed ]]; then
+  logger -t nbot-snowluma-watchdog 'service is in failed state; systemd gave up, watchdog stands down'
+  rm -f "$web_fail" "$hook_fail" "$qq_fail" "$grace"
+  exit 0
+fi
+
 # QQ runtime protection runs first and does not depend on SnowLuma being
 # alive: a broken Xvfb/D-Bus must be recovered even while SnowLuma is down.
 qq_pid=

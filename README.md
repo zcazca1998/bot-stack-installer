@@ -283,8 +283,15 @@ sudo nbot install-caddy
 
 ### 守护策略
 
-- 主服务用 `Restart=on-abnormal`：正常退出和程序主动报错退出不会被立即拉起，
-  信号杀死才恢复。
+- 主服务用 `Restart=on-failure` + `StartLimitBurst=3`（5 分钟窗口），
+  用**活了多久**区分两种失败：
+  - 跑着跑着崩了（偶发 bug、被 OOM 杀掉、外部因素）→ 自动拉起
+  - 起来就崩（配置错、端口占用）→ 试 3 次后停手，停在 `failed` 等人处理
+- **看门狗与 systemd 遵守同一套判据**：服务处于 `failed`（systemd 已放弃）或
+  `inactive`（用户主动停止）时，看门狗一律不动作，也不累积失败计数。
+  不会出现「systemd 放弃了、看门狗还在反复拉」的情况。
+- 触顶后连手动启动都会被 systemd 拒绝，所以 `nbot <组件> start/restart`
+  和 `nbot repair` 会先自动 `reset-failed`，修好问题就能正常启动。
 - WebUI 或 Hook **连续三次**检查失败才判定假死并重启，单次波动不触发。
 - Hook 丢失优先只重启 SnowLuma，不轻易重启 QQ。
 - QQ 掉线只自动恢复一次，仍需登录时等待人工 `nbot login`。

@@ -10,9 +10,21 @@ if command -v node >/dev/null 2>&1; then
   node --check "$ROOT/assets/bin/write-onebot-config"
 fi
 
-grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/nbot-astrbot.service"
-grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/nbot-snowluma.service"
-grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/nbot-qq.service"
+# 用存活时长区分「起不来」与「跑着崩了」：on-failure 负责拉起偶发崩溃，
+# StartLimitBurst 负责在反复起不来时停手。两者缺一不可。
+for unit in nbot-astrbot nbot-snowluma nbot-qq; do
+  grep -q '^Restart=on-failure$' "$ROOT/assets/systemd/${unit}.service"
+  grep -q '^StartLimitBurst=' "$ROOT/assets/systemd/${unit}.service"
+  # StartLimit* 必须在 [Unit] 段，放 [Service] 会被静默忽略。
+  sed -n '/^\[Unit\]/,/^\[Service\]/p' "$ROOT/assets/systemd/${unit}.service" |
+    grep -q '^StartLimitIntervalSec=' ||
+    { echo "${unit}: StartLimit* 必须位于 [Unit] 段" >&2; exit 1; }
+done
+# 看门狗必须与 systemd 对齐：failed 时不介入。
+grep -q 'failed.*systemd gave up' "$ROOT/assets/bin/snowluma-healthcheck"
+grep -q 'failed.*systemd gave up' "$ROOT/assets/bin/astrbot-healthcheck"
+# 触顶后手动启动会被拒，控制命令要替用户 reset-failed。
+grep -q 'systemctl reset-failed' "$ROOT/install-core.sh"
 grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-snowluma.service"
 grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-qq.service"
 ! grep -R -q '^Restart=always$' "$ROOT/assets/systemd"

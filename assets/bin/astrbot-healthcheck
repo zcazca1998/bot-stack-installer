@@ -5,7 +5,16 @@ source /etc/nbot.conf
 failures=/run/nbot-astrbot-watchdog.failures
 grace=/run/nbot-astrbot-watchdog.grace
 
-systemctl is-active --quiet nbot-astrbot.service || { rm -f "$failures" "$grace"; exit 0; }
+# 与 systemd 的重启策略对齐：只在服务真正 active 时才判假死。
+# failed（systemd 用 StartLimitBurst 放弃了）和 inactive（用户主动 stop）
+# 都不动作，并清掉计数，避免下次启动时被陈旧计数误伤。
+state=$(systemctl is-active nbot-astrbot.service 2>/dev/null || true)
+if [[ "$state" != active ]]; then
+  [[ "$state" != failed ]] ||
+    logger -t nbot-astrbot-watchdog 'service is in failed state; systemd gave up, watchdog stands down'
+  rm -f "$failures" "$grace"
+  exit 0
+fi
 pid=$(systemctl show nbot-astrbot.service -p MainPID --value)
 [[ "$pid" =~ ^[1-9][0-9]*$ ]] || exit 0
 now=$(date +%s)
