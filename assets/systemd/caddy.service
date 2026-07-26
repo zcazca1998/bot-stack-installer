@@ -1,5 +1,5 @@
 [Unit]
-Description=Caddy reverse proxy (installed by bot-stack)
+Description=Caddy reverse proxy (installed by nbot)
 After=network-online.target
 Wants=network-online.target
 

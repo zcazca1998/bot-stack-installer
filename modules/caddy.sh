@@ -18,7 +18,7 @@ ensure_selfsigned_cert() {
   install -d -m 0755 "$CADDY_CONF_DIR"
   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
     -keyout "$key" -out "$crt" \
-    -subj "/CN=bot-stack-novnc" \
+    -subj "/CN=nbot-novnc" \
     -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" 2>/dev/null || true
   [[ -s "$crt" && -s "$key" ]] || die "自签名证书生成失败（openssl req 报错）。"
   chmod 0644 "$crt"
@@ -79,11 +79,11 @@ ensure_caddyfile_import() {
   local caddyfile="$CADDY_CONF_DIR/Caddyfile" import="import ${CADDY_CONF_DIR}/conf.d/*.caddy"
   install -d -m 0755 "$CADDY_CONF_DIR" "$CADDY_CONF_DIR/conf.d"
   if [[ ! -f "$caddyfile" ]]; then
-    printf '# Managed by bot-stack\n%s\n' "$import" > "$caddyfile"
+    printf '# Managed by nbot\n%s\n' "$import" > "$caddyfile"
   elif ! grep -qF "$import" "$caddyfile"; then
-    cp -a "$caddyfile" "${caddyfile}.bot-stack.bak"
-    printf '\n# Added by bot-stack for noVNC\n%s\n' "$import" >> "$caddyfile"
-    warn "已在现有 Caddyfile 末尾追加 conf.d import（备份：${caddyfile}.bot-stack.bak）。"
+    cp -a "$caddyfile" "${caddyfile}.nbot.bak"
+    printf '\n# Added by nbot for noVNC\n%s\n' "$import" >> "$caddyfile"
+    warn "已在现有 Caddyfile 末尾追加 conf.d import（备份：${caddyfile}.nbot.bak）。"
   fi
 }
 
@@ -91,7 +91,7 @@ write_caddy_site() {
   local site=$1 user=$2 hash=$3 tls_line=$4
   install -d -m 0755 "$CADDY_CONF_DIR/conf.d"
   cat > "$(caddy_site_file)" <<EOF
-# Managed by bot-stack (install-caddy); rerunning install-caddy rewrites this file.
+# Managed by nbot (install-caddy); rerunning install-caddy rewrites this file.
 ${site} {
 ${tls_line}    basic_auth /novnc/* {
         ${user} ${hash}

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-BOT_STACK_CONFIG=/nonexistent
+NBOT_CONFIG=/nonexistent
 source "$ROOT/lib/common.sh"
 source "$ROOT/modules/snowluma.sh"
 ref=$(mirrored_image_ref "$SNOWLUMA_IMAGE")

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source /etc/bot-stack.conf
-: "${ASTRBOT_ROOT:=/bot-stack/astrbot}" "${ASTRBOT_PORT:=6185}"
+source /etc/nbot.conf
+: "${ASTRBOT_ROOT:=/nbot/astrbot}" "${ASTRBOT_PORT:=6185}"
 cd "$ASTRBOT_ROOT"
 export PYTHONPATH="$ASTRBOT_ROOT/app"
 config="$ASTRBOT_ROOT/data/cmd_config.json"

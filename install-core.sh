@@ -9,7 +9,7 @@ source "$SCRIPT_DIR/modules/novnc.sh"
 source "$SCRIPT_DIR/modules/caddy.sh"
 
 install_self() {
-  local target=/usr/local/lib/bot-stack/installer
+  local target=/usr/local/lib/nbot/installer
   # Skip the copy when running from the installed location itself; wipe the
   # target first so files removed upstream do not linger across upgrades.
   if [[ "$SCRIPT_DIR" != "$target" ]]; then
@@ -19,23 +19,24 @@ install_self() {
     # 又会在源目录同时被 git 操作时导致复制报错。
     tar -C "$SCRIPT_DIR" --exclude=./.git -cf - . | tar -C "$target" -xf -
   fi
-  # nbot 是主命令；bot-stack 保留为别名，避免既有安装与文档失效。
   cat > /usr/local/sbin/nbot <<'EOF'
 #!/bin/sh
-exec /usr/local/lib/bot-stack/installer/install.sh "$@"
+exec /usr/local/lib/nbot/installer/install.sh "$@"
 EOF
   chmod 0755 /usr/local/sbin/nbot "$target/install.sh"
-  ln -sfn /usr/local/sbin/nbot /usr/local/sbin/bot-stack
+  # 清理 1.7 之前的 bot-stack 命令与运行时目录。
+  rm -f /usr/local/sbin/bot-stack
+  [[ ! -d /usr/local/lib/bot-stack ]] || rm -rf /usr/local/lib/bot-stack
 }
 
 configure_base() {
-  local previous_home=$BOT_STACK_HOME
+  local previous_home=$NBOT_HOME
   bold "基础配置（回车保留默认值，输入 - 可清空该项）"
-  prompt_default BOT_STACK_HOME "统一工作区目录（各组件按名字放子目录）" "$BOT_STACK_HOME"
-  if [[ "$BOT_STACK_HOME" != "$previous_home" ]]; then
-    ASTRBOT_ROOT="${BOT_STACK_HOME}/astrbot"
-    SNOWLUMA_ROOT="${BOT_STACK_HOME}/snowluma"
-    SNOWLUMA_PAYLOAD_ROOT="${BOT_STACK_HOME}/payload/snowluma"
+  prompt_default NBOT_HOME "统一工作区目录（各组件按名字放子目录）" "$NBOT_HOME"
+  if [[ "$NBOT_HOME" != "$previous_home" ]]; then
+    ASTRBOT_ROOT="${NBOT_HOME}/astrbot"
+    SNOWLUMA_ROOT="${NBOT_HOME}/snowluma"
+    SNOWLUMA_PAYLOAD_ROOT="${NBOT_HOME}/payload/snowluma"
   fi
   prompt_default ASTRBOT_ROOT "AstrBot 数据目录" "$ASTRBOT_ROOT"
   prompt_default SNOWLUMA_ROOT "SnowLuma 数据目录" "$SNOWLUMA_ROOT"
@@ -82,8 +83,8 @@ status_all() {
       printf '%-28s %s\n' "$unit" "$(systemctl is-active "$unit" 2>/dev/null || true)"
     fi
   done
-  [[ -x /usr/local/lib/bot-stack/qq-status ]] &&
-    /usr/local/lib/bot-stack/qq-status || true
+  [[ -x /usr/local/lib/nbot/qq-status ]] &&
+    /usr/local/lib/nbot/qq-status || true
 }
 
 doctor() {
@@ -152,12 +153,12 @@ install_all() {
 
 uninstall_stack() {
   local unit path answer
-  bold "卸载 Bot Stack"
-  confirm "停止并移除所有 bot-stack 服务与程序？（数据目录默认保留）" N || return 0
-  for unit in astrbot-watchdog.timer snowluma-watchdog.timer bot-stack-logclean.timer \
+  bold "卸载 nbot"
+  confirm "停止并移除所有 nbot 服务与程序？（数据目录默认保留）" N || return 0
+  for unit in astrbot-watchdog.timer snowluma-watchdog.timer nbot-logclean.timer \
     snowluma-novnc.service snowluma-vnc.service snowluma.service snowluma-qq.service \
     astrbot.service astrbot-watchdog.service snowluma-watchdog.service \
-    bot-stack-logclean.service; do
+    nbot-logclean.service; do
     systemctl stop "$unit" 2>/dev/null || true
     systemctl disable "$unit" 2>/dev/null || true
     rm -f "/etc/systemd/system/$unit"
@@ -170,13 +171,13 @@ uninstall_stack() {
     rm -f "$CADDY_CONF_DIR/conf.d/novnc.caddy"
   fi
   systemctl daemon-reload
-  rm -rf /usr/local/lib/bot-stack
+  rm -rf /usr/local/lib/nbot
   rm -f /usr/local/bin/snowlumactl /usr/local/bin/qqlogin /usr/local/bin/qqrefresh \
     /usr/local/bin/astrbotctl /usr/local/bin/novncctl \
     /usr/local/sbin/nbot /usr/local/sbin/bot-stack
-  rm -f /etc/logrotate.d/bot-stack
-  if [[ -f /etc/systemd/journald.conf.d/bot-stack.conf ]]; then
-    rm -f /etc/systemd/journald.conf.d/bot-stack.conf
+  rm -f /etc/logrotate.d/nbot
+  if [[ -f /etc/systemd/journald.conf.d/nbot.conf ]]; then
+    rm -f /etc/systemd/journald.conf.d/nbot.conf
     systemctl restart systemd-journald 2>/dev/null || true
   fi
   info "服务与程序已移除。数据仍保留在："
@@ -199,7 +200,7 @@ uninstall_stack() {
 
 show_help() {
   cat <<'EOF'
-Bot Stack 安装管理器（命令 nbot，兼容旧名 bot-stack）
+nbot 安装管理器
 用法：nbot <命令>        （无参数进入交互菜单）
 
 安装与配置
@@ -248,7 +249,7 @@ menu() {
   while :; do
     cat <<'EOF'
 
-Bot Stack 安装管理
+nbot 安装管理
   0) 一键安装全部（AstrBot + SnowLuma + QQ，可选 noVNC/Caddy）
   1) 基础配置（目录 / 端口 / 下载代理）
   2) 安装/更新 AstrBot

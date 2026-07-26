@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 let fileConfig = "";
-try { fileConfig = fs.readFileSync("/etc/bot-stack.conf", "utf8"); } catch {}
+try { fileConfig = fs.readFileSync("/etc/nbot.conf", "utf8"); } catch {}
 const readSetting = (name, fallback) => {
   const match = fileConfig.match(new RegExp(`^${name}=([^\\r\\n]+)$`, "m"));
   return match ? match[1].replace(/^['\"]|['\"]$/g, "") : fallback;

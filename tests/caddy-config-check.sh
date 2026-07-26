@@ -3,7 +3,7 @@ set -Eeuo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-BOT_STACK_CONFIG=/nonexistent
+NBOT_CONFIG=/nonexistent
 CADDY_CONF_DIR="$tmp/caddy"
 NOVNC_PORT=7080
 source "$ROOT/lib/common.sh"
@@ -19,7 +19,7 @@ printf 'example.org {\n    respond "hi"\n}\n' > "$tmp/caddy/Caddyfile"
 ensure_caddyfile_import
 grep -q 'example.org' "$tmp/caddy/Caddyfile"
 grep -qF "import $tmp/caddy/conf.d/*.caddy" "$tmp/caddy/Caddyfile"
-[[ -f "$tmp/caddy/Caddyfile.bot-stack.bak" ]]
+[[ -f "$tmp/caddy/Caddyfile.nbot.bak" ]]
 
 site="$tmp/caddy/conf.d/novnc.caddy"
 

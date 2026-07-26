@@ -3,4 +3,4 @@ Description=AstrBot health check
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/lib/bot-stack/astrbot-healthcheck
+ExecStart=/usr/local/lib/nbot/astrbot-healthcheck

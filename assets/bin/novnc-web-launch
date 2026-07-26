@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source /etc/bot-stack.conf
+source /etc/nbot.conf
 NOVNC_PORT=${NOVNC_PORT:-6080}
 NOVNC_VNC_PORT=${NOVNC_VNC_PORT:-5901}
 

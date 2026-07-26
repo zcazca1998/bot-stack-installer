@@ -3,20 +3,20 @@ set -Eeuo pipefail
 
 install_runtime_assets() {
   local file
-  install -d -m 0755 /usr/local/lib/bot-stack
+  install -d -m 0755 /usr/local/lib/nbot
   for file in "$SCRIPT_DIR"/assets/bin/*; do
-    install -m 0755 "$file" "/usr/local/lib/bot-stack/$(basename "$file")"
+    install -m 0755 "$file" "/usr/local/lib/nbot/$(basename "$file")"
   done
   for file in snowlumactl qqlogin qqrefresh astrbotctl novncctl; do
     install -m 0755 "$SCRIPT_DIR/assets/bin/$file" "/usr/local/bin/$file"
   done
   # 日志限制：logrotate 轮转 + 每日清理定时器 + 可选 journald 总量上限。
-  install -m 0644 "$SCRIPT_DIR/assets/systemd/bot-stack-logclean.service" /etc/systemd/system/bot-stack-logclean.service
-  install -m 0644 "$SCRIPT_DIR/assets/systemd/bot-stack-logclean.timer" /etc/systemd/system/bot-stack-logclean.timer
+  install -m 0644 "$SCRIPT_DIR/assets/systemd/nbot-logclean.service" /etc/systemd/system/nbot-logclean.service
+  install -m 0644 "$SCRIPT_DIR/assets/systemd/nbot-logclean.timer" /etc/systemd/system/nbot-logclean.timer
   write_logrotate_config
   write_journald_limit
   systemctl daemon-reload
-  systemctl enable --now bot-stack-logclean.timer >/dev/null 2>&1 || true
+  systemctl enable --now nbot-logclean.timer >/dev/null 2>&1 || true
 }
 
 normalized_image_ref() {
@@ -258,7 +258,7 @@ install_qq() {
 configure_onebot() {
   local uin token
   [[ -f "$SNOWLUMA_ROOT/app/index.mjs" ]] || die "Install SnowLuma first."
-  uin=$(/usr/local/lib/bot-stack/qq-login-state --uin 2>/dev/null || true)
+  uin=$(/usr/local/lib/nbot/qq-login-state --uin 2>/dev/null || true)
   [[ -n "$uin" ]] || prompt_default uin "QQ 号 (UIN)" "$QQ_UIN"
   [[ -n "$uin" ]] || die "未检测到已登录的 QQ 账号，也未提供 QQ 号。"
   read -r -s -p 'OneBot token（留空自动生成）: ' token; echo
@@ -268,7 +268,7 @@ configure_onebot() {
   ONEBOT_TOKEN=$token QQ_UIN=$uin SNOWLUMA_ROOT=$SNOWLUMA_ROOT \
     ONEBOT_HTTP_PORT=$ONEBOT_HTTP_PORT ASTRBOT_WS_PORT=$ASTRBOT_WS_PORT \
     "$SNOWLUMA_PAYLOAD_ROOT/runtime/node" \
-    /usr/local/lib/bot-stack/write-onebot-config
+    /usr/local/lib/nbot/write-onebot-config
   systemctl restart snowluma.service
   info "OneBot configured: HTTP 127.0.0.1:${ONEBOT_HTTP_PORT}; WS -> 127.0.0.1:${ASTRBOT_WS_PORT}/ws"
   info "OneBot token：${token}"

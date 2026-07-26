@@ -25,7 +25,7 @@ STUB
 chmod +x "$tmp/bin/curl"
 PATH="$tmp/bin:$PATH"
 
-BOT_STACK_CONFIG=/nonexistent
+NBOT_CONFIG=/nonexistent
 source "$ROOT/lib/common.sh"
 GITHUB_ACCESS=auto
 GITHUB_PROXY='socks5h://127.0.0.1:1'

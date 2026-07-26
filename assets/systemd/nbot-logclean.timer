@@ -1,5 +1,5 @@
 [Unit]
-Description=Daily bot-stack log pruning
+Description=Daily nbot log pruning
 
 [Timer]
 OnCalendar=daily

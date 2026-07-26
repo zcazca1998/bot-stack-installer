@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source /etc/bot-stack.conf
-: "${ASTRBOT_ROOT:=/bot-stack/astrbot}"
+source /etc/nbot.conf
+: "${ASTRBOT_ROOT:=/nbot/astrbot}"
 cd "$ASTRBOT_ROOT"
 export PYTHONUNBUFFERED=1
 exec "$ASTRBOT_ROOT/.venv/bin/python" "$ASTRBOT_ROOT/app/main.py"

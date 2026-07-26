@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -u
-source /etc/bot-stack.conf
+source /etc/nbot.conf
 cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
 deadline=$(( $(date +%s) + 90 ))
 attempts=0
@@ -34,7 +34,7 @@ main_window_visible() {
 }
 
 while (( $(date +%s) < deadline )); do
-  state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+  state=$(/usr/local/lib/nbot/qq-login-state --machine 2>/dev/null || echo unknown)
   [[ "$state" == logged-in ]] && exit 0
   resolve_xvfb || { sleep 2; continue; }
   main_window_visible 2>/dev/null && exit 0
@@ -53,7 +53,7 @@ while (( $(date +%s) < deadline )); do
   ((width >= 260 && width <= 520 && height >= 340 && height <= 650)) || { sleep 2; continue; }
   # 优先视觉定位：找到登录按钮的蓝色色带质心，不依赖固定尺寸或布局。
   x= y= how=
-  if spot=$(/usr/local/lib/bot-stack/qq-find-login-button "$display" "$auth" \
+  if spot=$(/usr/local/lib/nbot/qq-find-login-button "$display" "$auth" \
               "$win_x" "$win_y" "$width" "$height" 2>/dev/null); then
     read -r x y <<<"$spot"
     how=visual
@@ -86,7 +86,7 @@ while (( $(date +%s) < deadline )); do
   sleep 8
 done
 
-state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+state=$(/usr/local/lib/nbot/qq-login-state --machine 2>/dev/null || echo unknown)
 [[ "$state" == logged-in ]] && exit 0
 resolve_xvfb && main_window_visible 2>/dev/null && exit 0
 logger -t snowluma 'No safe QQ quick-login action was available; manual qqlogin may be required'

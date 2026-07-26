@@ -1,11 +1,11 @@
-# Bot Stack 交互式安装器
+# nbot — AstrBot + SnowLuma + QQ 一键部署器
 
 面向 Debian、Ubuntu、Armbian 的 AstrBot + SnowLuma + Linux QQ 部署脚本，自动识别 amd64/x86_64 与 arm64/aarch64。
 
 ## 部署方式
 
 - AstrBot 使用普通 Python venv，不使用 uv。
-- 若系统缺少 Python 3.12+，安装器会把官方 python-build-standalone 3.13 运行时放到 /bot-stack/astrbot/.python，再创建普通 venv。
+- 若系统缺少 Python 3.12+，安装器会把官方 python-build-standalone 3.13 运行时放到 /nbot/astrbot/.python，再创建普通 venv。
 - SnowLuma 与 QQ 从 SnowLuma 官方多架构 OCI 镜像拆出，但不会安装或运行 Docker daemon。
 - 镜像内的 SnowLuma、QQ 和 Node 被复制到数据盘，然后由原生 systemd 管理。
 - QQ 与 SnowLuma 使用同一个 snowluma 用户、DISPLAY、D-Bus 和 Hook 运行目录。
@@ -14,19 +14,19 @@
 
 默认目录（统一工作区，基础配置里可整体或单独自定义）：
 
-- 统一工作区：/bot-stack
-- AstrBot 数据：/bot-stack/astrbot
-- SnowLuma 配置、缓存和 QQ 登录态：/bot-stack/snowluma
-- SnowLuma、QQ、Node 程序载荷：/bot-stack/payload/snowluma
-- 系统盘只保存小型 unit、控制脚本和 /etc/bot-stack.conf
-- 旧版本装过的机器沿用 /etc/bot-stack.conf 里已保存的路径，不受新默认值影响
+- 统一工作区：/nbot
+- AstrBot 数据：/nbot/astrbot
+- SnowLuma 配置、缓存和 QQ 登录态：/nbot/snowluma
+- SnowLuma、QQ、Node 程序载荷：/nbot/payload/snowluma
+- 系统盘只保存小型 unit、控制脚本和 /etc/nbot.conf
+- 旧版本装过的机器沿用 /etc/nbot.conf 里已保存的路径，不受新默认值影响
 
 拆镜像时载荷目录至少需要 6 GiB 可用空间。临时 OCI 层与 rootfs 会在成功或失败后清除。
 
 ## 使用
 
 ~~~bash
-cd bot-stack-installer
+cd nbot
 chmod +x install.sh
 sudo ./install.sh        # 首次；安装后任何目录直接 sudo nbot
 ~~~
@@ -51,7 +51,7 @@ sudo ./install.sh repair
 sudo nbot uninstall
 ~~~
 
-安装器注册 `nbot` 命令（旧名 `bot-stack` 仍可用），后续可执行：
+安装器注册 `nbot` 命令，后续在任意目录可执行：
 
 ~~~bash
 nbot status
@@ -70,10 +70,10 @@ sudo ./install.sh install-novnc
 ~~~
 
 - websockify 与 x11vnc 都只绑定 127.0.0.1，不直接暴露公网；请用 Nginx 或 Caddy 反向代理并叠加 HTTPS 与鉴权。
-- 现成的反代示例（含 WebSocket upgrade、超时、Caddy basic_auth）写在 /usr/local/lib/bot-stack/novnc-proxy.example，`novncctl proxy-example` 可随时查看。
+- 现成的反代示例（含 WebSocket upgrade、超时、Caddy basic_auth）写在 /usr/local/lib/nbot/novnc-proxy.example，`novncctl proxy-example` 可随时查看。
 - noVNC 使用相对路径，可直接挂在 /novnc/ 之类的子路径下；websockify 开启了 30 秒心跳，避免被反代空闲超时断开。
 - x11vnc 复用 QQ 的 DISPLAY :91 与 Xauthority，随 snowluma-qq.service 启停（PartOf）。
-- VNC 密码保存在 /bot-stack/snowluma/config/vnc-password，`novncctl password` 查看；它只是第二层防护，鉴权必须由反代承担。
+- VNC 密码保存在 /nbot/snowluma/config/vnc-password，`novncctl password` 查看；它只是第二层防护，鉴权必须由反代承担。
 
 安装器可以直接接管 Caddy（noVNC 装完会询问，也可单独执行）：
 
@@ -160,8 +160,8 @@ dockerproxy.net/motricseven7/snowluma:latest
 安装前应确认数据盘已经挂载：
 
 ~~~bash
-findmnt --target /bot-stack
-df -h /bot-stack
+findmnt --target /nbot
+df -h /nbot
 ~~~
 
 脚本不会格式化磁盘，也不会自行修改 /etc/fstab。

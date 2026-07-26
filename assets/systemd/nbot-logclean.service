@@ -1,0 +1,6 @@
+[Unit]
+Description=Prune nbot log files and crash dumps
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/nbot/nbot-logclean

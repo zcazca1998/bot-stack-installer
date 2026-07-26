@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source /etc/bot-stack.conf
-: "${SNOWLUMA_ROOT:=/bot-stack/snowluma}" "${ASTRBOT_ROOT:=/bot-stack/astrbot}"
+source /etc/nbot.conf
+: "${SNOWLUMA_ROOT:=/nbot/snowluma}" "${ASTRBOT_ROOT:=/nbot/astrbot}"
 
 prune_age() {
   local dir=$1 days=$2

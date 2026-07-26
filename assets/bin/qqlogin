@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source /etc/bot-stack.conf
-SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-/bot-stack/snowluma}
+source /etc/nbot.conf
+SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-/nbot/snowluma}
 
 usage() {
   echo '用法: qqlogin [--fresh]'
@@ -81,11 +81,11 @@ if [[ "$service_state" != active && "$service_state" != activating ]]; then
 fi
 
 if ((fresh == 0)); then
-  state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+  state=$(/usr/local/lib/nbot/qq-login-state --machine 2>/dev/null || echo unknown)
   if [[ "$state" == logged-in ]]; then
     # login.enc can still claim logged-in after the account was kicked;
     # only the OneBot get_status probe tells the truth.
-    online=$(/usr/local/lib/bot-stack/qq-status --machine 2>/dev/null || echo unknown)
+    online=$(/usr/local/lib/nbot/qq-status --machine 2>/dev/null || echo unknown)
     if [[ "$online" == online ]]; then
       echo 'QQ 已登录且在线，无需重新扫码。'
       exit 0
@@ -139,7 +139,7 @@ ticks=0
 qrless=0
 stage=0
 while :; do
-  if [[ $(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || true) == logged-in ]] ||
+  if [[ $(/usr/local/lib/nbot/qq-login-state --machine 2>/dev/null || true) == logged-in ]] ||
      main_window_visible 2>/dev/null; then
     printf '\033[0m\033[H\033[2JQQ 登录成功。\n'
     exit 0

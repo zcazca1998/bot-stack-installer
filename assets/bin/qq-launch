@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source /etc/bot-stack.conf
-: "${SNOWLUMA_ROOT:=/bot-stack/snowluma}"
+source /etc/nbot.conf
+: "${SNOWLUMA_ROOT:=/nbot/snowluma}"
 release=$(readlink -f "$SNOWLUMA_ROOT/qq/current")
 [[ -r "$release/.qq-executable" ]] || { echo "QQ executable metadata is missing" >&2; exit 3; }
 relative=$(<"$release/.qq-executable")
@@ -42,7 +42,7 @@ for _ in {1..300}; do
 done
 [[ -S /tmp/.X11-unix/X91 ]] || { echo "Xvfb display did not become ready" >&2; exit 3; }
 
-/usr/local/lib/bot-stack/qq-auto-login &
+/usr/local/lib/nbot/qq-auto-login &
 cd "$SNOWLUMA_ROOT"
 # shellcheck disable=SC2086
 exec "$executable" --no-sandbox $SNOWLUMA_QQ_FLAGS

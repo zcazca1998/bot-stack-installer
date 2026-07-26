@@ -30,7 +30,7 @@ exit 0
 STUB
 chmod +x "$tmp/bin/skopeo"
 PATH="$tmp/bin:$PATH"
-BOT_STACK_CONFIG=/nonexistent
+NBOT_CONFIG=/nonexistent
 SNOWLUMA_PAYLOAD_ROOT="$tmp/payload"
 SNOWLUMA_IMAGE=motricseven7/snowluma:latest
 SNOWLUMA_IMAGE_MIRROR=dockerproxy.net

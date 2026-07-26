@@ -9,8 +9,8 @@ install_novnc_units() {
 }
 
 write_novnc_proxy_example() {
-  install -d -m 0755 /usr/local/lib/bot-stack
-  cat > /usr/local/lib/bot-stack/novnc-proxy.example <<EOF
+  install -d -m 0755 /usr/local/lib/nbot
+  cat > /usr/local/lib/nbot/novnc-proxy.example <<EOF
 # noVNC listens on 127.0.0.1:${NOVNC_PORT} only; expose it through a reverse
 # proxy with WebSocket upgrade enabled. Always add HTTPS and proxy-level
 # authentication: the short VNC password alone is weak protection for a live
@@ -84,7 +84,7 @@ install_novnc() {
 
   info "noVNC 已就绪：http://127.0.0.1:${NOVNC_PORT}/vnc.html（仅监听本机）"
   info "VNC 密码：$(<"$passwd_file")（novncctl password 可再次查看）"
-  info "反向代理示例：/usr/local/lib/bot-stack/novnc-proxy.example（novncctl proxy-example 查看）"
+  info "反向代理示例：/usr/local/lib/nbot/novnc-proxy.example（novncctl proxy-example 查看）"
   warn "noVNC 可完全操作 QQ 会话，务必在反向代理上叠加 HTTPS 与鉴权后再暴露。"
 
   if confirm "现在让安装器接管 Caddy（自动安装并生成 HTTPS + 登录配置）吗？" Y; then

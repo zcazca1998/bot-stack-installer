@@ -2,12 +2,12 @@
 
 set -Eeuo pipefail
 
-CONFIG_FILE=${BOT_STACK_CONFIG:-/etc/bot-stack.conf}
+CONFIG_FILE=${NBOT_CONFIG:-/etc/nbot.conf}
 # 统一工作区：三个组件按名字放在同一目录下；旧安装的自定义路径
 # 保存在配置文件里，不受新默认值影响。
-BOT_STACK_HOME=${BOT_STACK_HOME:-/bot-stack}
-ASTRBOT_ROOT=${ASTRBOT_ROOT:-${BOT_STACK_HOME}/astrbot}
-SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-${BOT_STACK_HOME}/snowluma}
+NBOT_HOME=${NBOT_HOME:-/nbot}
+ASTRBOT_ROOT=${ASTRBOT_ROOT:-${NBOT_HOME}/astrbot}
+SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-${NBOT_HOME}/snowluma}
 ASTRBOT_PORT=${ASTRBOT_PORT:-6185}
 ASTRBOT_WS_PORT=${ASTRBOT_WS_PORT:-6199}
 SNOWLUMA_WEBUI_PORT=${SNOWLUMA_WEBUI_PORT:-5099}
@@ -18,7 +18,7 @@ SNOWLUMA_IMAGE=${SNOWLUMA_IMAGE:-motricseven7/snowluma:latest}
 SNOWLUMA_IMAGE_MIRROR=${SNOWLUMA_IMAGE_MIRROR:-dockerproxy.net}
 SNOWLUMA_IMAGE_FALLBACK_MIRROR=${SNOWLUMA_IMAGE_FALLBACK_MIRROR:-docker.1ms.run}
 SNOWLUMA_IMAGE_PROXY=${SNOWLUMA_IMAGE_PROXY:-}
-SNOWLUMA_PAYLOAD_ROOT=${SNOWLUMA_PAYLOAD_ROOT:-${BOT_STACK_HOME}/payload/snowluma}
+SNOWLUMA_PAYLOAD_ROOT=${SNOWLUMA_PAYLOAD_ROOT:-${NBOT_HOME}/payload/snowluma}
 NOVNC_PORT=${NOVNC_PORT:-6080}
 NOVNC_VNC_PORT=${NOVNC_VNC_PORT:-5901}
 # journald 总量上限；留空表示不修改系统默认。
@@ -28,11 +28,21 @@ CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT:-8443}
 CADDY_AUTH_USER=${CADDY_AUTH_USER:-admin}
 QQ_UIN=${QQ_UIN:-}
 
-if [[ -r "$CONFIG_FILE" ]]; then
+# 从旧的 bot-stack 命名迁移：只读取旧配置，实际搬迁在 migrate_legacy_layout
+# 里进行（需要 root 且要先停服务）。
+LEGACY_CONFIG=/etc/bot-stack.conf
+if [[ ! -r "$CONFIG_FILE" && -r "$LEGACY_CONFIG" ]]; then
+  # shellcheck disable=SC1090
+  source "$LEGACY_CONFIG"
+  NBOT_LEGACY_FOUND=1
+elif [[ -r "$CONFIG_FILE" ]]; then
   # The installer owns this root-only file.
   # shellcheck disable=SC1090
   source "$CONFIG_FILE"
 fi
+# 旧配置里没有 NBOT_HOME，且路径仍指向旧默认值时保持原样，避免误搬用户数据。
+BOT_STACK_HOME=${BOT_STACK_HOME:-}
+[[ -z "$BOT_STACK_HOME" ]] || NBOT_HOME=$BOT_STACK_HOME
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
 info() { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
@@ -208,7 +218,7 @@ write_config() {
   local tmp
   tmp=$(mktemp)
   {
-    printf 'BOT_STACK_HOME=%q\n' "$BOT_STACK_HOME"
+    printf 'NBOT_HOME=%q\n' "$NBOT_HOME"
     printf 'ASTRBOT_ROOT=%q\n' "$ASTRBOT_ROOT"
     printf 'SNOWLUMA_ROOT=%q\n' "$SNOWLUMA_ROOT"
     printf 'ASTRBOT_PORT=%q\n' "$ASTRBOT_PORT"
@@ -256,6 +266,29 @@ find_python() {
   return 1
 }
 
+migrate_legacy_layout() {
+  # 1.7 之前叫 bot-stack：配置在 /etc/bot-stack.conf，运行时脚本在
+  # /usr/local/lib/bot-stack，单元名前缀 bot-stack-。数据目录保持原样
+  # （配置里已记录绝对路径），只搬迁安装器自身的文件与命名。
+  [[ ${NBOT_LEGACY_FOUND:-0} == 1 ]] || return 0
+  [[ ${EUID:-$(id -u)} -eq 0 ]] || return 0
+  info "检测到旧版 bot-stack 安装，正在迁移到 nbot 命名。"
+  systemctl stop bot-stack-logclean.timer 2>/dev/null || true
+  systemctl disable bot-stack-logclean.timer 2>/dev/null || true
+  rm -f /etc/systemd/system/bot-stack-logclean.timer \
+        /etc/systemd/system/bot-stack-logclean.service \
+        /etc/logrotate.d/bot-stack
+  if [[ -f /etc/systemd/journald.conf.d/bot-stack.conf ]]; then
+    mv -f /etc/systemd/journald.conf.d/bot-stack.conf \
+          /etc/systemd/journald.conf.d/nbot.conf
+  fi
+  write_config
+  rm -f "$LEGACY_CONFIG"
+  info "迁移完成：配置现在位于 $CONFIG_FILE，数据目录未改动。"
+  info "旧的 systemd 单元会在本次安装/修复中以 nbot 命名重新写入。"
+  NBOT_LEGACY_FOUND=0
+}
+
 write_logrotate_config() {
   # 按大小 + 天数轮转应用自有日志文件；journald 部分由 SystemMaxUse 兜底。
   # snowluma 用户还不存在时（仅装 AstrBot）跳过对应段，避免 logrotate 报错。
@@ -285,12 +318,12 @@ ${ASTRBOT_ROOT}/data/logs/*.log {
     copytruncate
 }
 EOF
-  } > /etc/logrotate.d/bot-stack
-  chmod 0644 /etc/logrotate.d/bot-stack
+  } > /etc/logrotate.d/nbot
+  chmod 0644 /etc/logrotate.d/nbot
 }
 
 write_journald_limit() {
-  local dropin=/etc/systemd/journald.conf.d/bot-stack.conf content
+  local dropin=/etc/systemd/journald.conf.d/nbot.conf content
   [[ -n "$JOURNALD_MAX_USE" ]] || return 0
   content="[Journal]
 SystemMaxUse=${JOURNALD_MAX_USE}"

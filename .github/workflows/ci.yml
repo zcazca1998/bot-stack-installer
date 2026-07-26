@@ -61,10 +61,10 @@ jobs:
           done
           echo 'WebUI did not answer within 60s' >&2
           exit 1
-      - name: bot-stack status and doctor
+      - name: nbot status and doctor
         run: |
-          sudo bot-stack status
-          sudo bot-stack doctor
+          sudo nbot status
+          sudo nbot doctor
       - name: Logs on failure
         if: failure()
         run: sudo journalctl -u astrbot.service -n 200 --no-pager || true
@@ -77,21 +77,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Point data roots at /mnt and disable China-facing mirrors
         run: |
-          sudo tee /etc/bot-stack.conf >/dev/null <<'EOF'
-          ASTRBOT_ROOT=/mnt/AstrBot
-          SNOWLUMA_ROOT=/mnt/snowluma
-          SNOWLUMA_PAYLOAD_ROOT=/mnt/AstrBot/.bot-stack/snowluma
+          sudo tee /etc/nbot.conf >/dev/null <<'EOF'
+          ASTRBOT_ROOT=/mnt/nbot/astrbot
+          SNOWLUMA_ROOT=/mnt/nbot/snowluma
+          SNOWLUMA_PAYLOAD_ROOT=/mnt/nbot/payload/snowluma
           SNOWLUMA_IMAGE_MIRROR=
           SNOWLUMA_IMAGE_FALLBACK_MIRROR=
           EOF
-          sudo chmod 600 /etc/bot-stack.conf
+          sudo chmod 600 /etc/nbot.conf
           df -h /mnt
       - name: Install SnowLuma + QQ from the official image
         run: sudo ./install.sh install-snowluma
       - name: Verify QQ and SnowLuma services
         run: |
           systemctl is-active snowluma-qq.service snowluma.service
-          sudo /usr/local/lib/bot-stack/qq-status || true
+          sudo /usr/local/lib/nbot/qq-status || true
       - name: Install noVNC (defaults, decline Caddy prompt)
         run: printf '\n\nn\n' | sudo ./install.sh install-novnc
       - name: Install Caddy (self-signed defaults)

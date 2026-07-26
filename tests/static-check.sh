@@ -47,29 +47,29 @@ grep -q 'verify_dynamic_dependencies' "$ROOT/modules/snowluma.sh"
 grep -q 'Prefetching verified large image layer' "$ROOT/modules/snowluma.sh"
 grep -q 'cp -aln.*cache/sha256' "$ROOT/modules/snowluma.sh"
 grep -q 'prune_image_releases' "$ROOT/modules/snowluma.sh"
-grep -q 'astrbot-prepare.*usr/local/lib/bot-stack/astrbot-prepare' "$ROOT/modules/astrbot.sh"
+grep -q 'astrbot-prepare.*usr/local/lib/nbot/astrbot-prepare' "$ROOT/modules/astrbot.sh"
 # astrbot.cli init prompts interactively; systemd has no stdin to answer with.
 grep -q "printf 'y" "$ROOT/assets/bin/astrbot-prepare"
 # Ubuntu 24.04 / Debian 13 renamed several libs with a t64 suffix.
 grep -q 't64' "$ROOT/lib/common-base.sh"
 # Unified workspace, one-shot install, and uninstall must exist.
-grep -q 'BOT_STACK_HOME' "$ROOT/lib/common-base.sh"
-grep -q 'BOT_STACK_HOME=%q' "$ROOT/lib/common-base.sh"
+grep -q 'NBOT_HOME' "$ROOT/lib/common-base.sh"
+grep -q 'NBOT_HOME=%q' "$ROOT/lib/common-base.sh"
 grep -q 'install_all()' "$ROOT/install-core.sh"
 grep -q 'uninstall_stack()' "$ROOT/install-core.sh"
 # Data deletion must require typing DELETE explicitly.
 grep -q 'DELETE' "$ROOT/install-core.sh"
 
 # Log limits: logrotate, daily pruning timer, optional journald cap, help.
-grep -q 'logrotate.d/bot-stack' "$ROOT/lib/common-base.sh"
+grep -q 'logrotate.d/nbot' "$ROOT/lib/common-base.sh"
 grep -q 'SystemMaxUse' "$ROOT/lib/common-base.sh"
-[[ -f "$ROOT/assets/bin/bot-stack-logclean" ]]
-[[ -f "$ROOT/assets/systemd/bot-stack-logclean.timer" ]]
-grep -q 'bot-stack-logclean' "$ROOT/modules/snowluma.sh"
+[[ -f "$ROOT/assets/bin/nbot-logclean" ]]
+[[ -f "$ROOT/assets/systemd/nbot-logclean.timer" ]]
+grep -q 'nbot-logclean' "$ROOT/modules/snowluma.sh"
 grep -q 'show_help()' "$ROOT/install-core.sh"
 # Uninstall must remove the logrotate and journald drop-ins.
-grep -q 'rm -f /etc/logrotate.d/bot-stack' "$ROOT/install-core.sh"
-grep -q 'journald.conf.d/bot-stack.conf' "$ROOT/install-core.sh"
+grep -q 'rm -f /etc/logrotate.d/nbot' "$ROOT/install-core.sh"
+grep -q 'journald.conf.d/nbot.conf' "$ROOT/install-core.sh"
 
 # Runtime scripts must survive a partial config file under set -u, and the
 # entry point must normalize partial configs into a complete one.
@@ -80,15 +80,19 @@ grep -q '^write_config$' "$ROOT/install.sh"
 grep -q 'exclude=./.git' "$ROOT/install.sh"
 grep -q 'exclude=./.git' "$ROOT/install-core.sh"
 
-# nbot is the primary command; bot-stack stays as a symlink for existing
-# installs, and both must be removed on uninstall.
+# nbot is the only command name; the legacy bot-stack entry point and runtime
+# directory must be removed, and legacy installs must be migrated.
 grep -q 'sbin/nbot <<' "$ROOT/install-core.sh"
-grep -q 'ln -sfn /usr/local/sbin/nbot /usr/local/sbin/bot-stack' "$ROOT/install-core.sh"
-grep -q 'sbin/nbot /usr/local/sbin/bot-stack' "$ROOT/install-core.sh"
-# User-facing hints must use the short command.
-! grep -rqE '(exec|执行) bot-stack ' "$ROOT/assets/bin" "$ROOT/modules"
+grep -q 'rm -f /usr/local/sbin/bot-stack' "$ROOT/install-core.sh"
+grep -q 'rm -rf /usr/local/lib/bot-stack' "$ROOT/install-core.sh"
+grep -q 'migrate_legacy_layout' "$ROOT/install.sh"
+grep -q 'migrate_legacy_layout()' "$ROOT/lib/common-base.sh"
+grep -q 'NBOT_CONFIG:-/etc/nbot.conf' "$ROOT/lib/common-base.sh"
+# No runtime script may still read the old config path or lib directory.
+! grep -rq '/etc/bot-stack.conf' "$ROOT/assets" "$ROOT/modules" "$ROOT/lib"
+! grep -rq '/usr/local/lib/bot-stack' "$ROOT/assets" "$ROOT/modules"
 
-# install-all must offer QR login; bot-stack qqlogin must pass through.
+# install-all must offer QR login; nbot qqlogin must pass through.
 grep -q '现在就扫码登录 QQ' "$ROOT/install-core.sh"
 grep -q 'qqlogin) exec /usr/local/bin/qqlogin' "$ROOT/install-core.sh"
 # Every helper script must carry the executable bit in git (JS files are

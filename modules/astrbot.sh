@@ -58,7 +58,7 @@ install_astrbot() {
   "$PYTHON_BIN" -m venv "$venv_new"
   "$venv_new/bin/python" -m pip install --upgrade pip setuptools wheel
   "$venv_new/bin/python" -m pip install -r "$app_new/requirements.txt"
-  printf '%s\n' "$tag" > "$app_new/.bot-stack-version"
+  printf '%s\n' "$tag" > "$app_new/.nbot-version"
 
   install_runtime_assets
   install_astrbot_units
@@ -96,10 +96,10 @@ install_astrbot() {
 }
 
 install_astrbot_units() {
-  install -d -m 0755 /usr/local/lib/bot-stack
-  install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-prepare" /usr/local/lib/bot-stack/astrbot-prepare
-  install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-launch" /usr/local/lib/bot-stack/astrbot-launch
-  install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-healthcheck" /usr/local/lib/bot-stack/astrbot-healthcheck
+  install -d -m 0755 /usr/local/lib/nbot
+  install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-prepare" /usr/local/lib/nbot/astrbot-prepare
+  install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-launch" /usr/local/lib/nbot/astrbot-launch
+  install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-healthcheck" /usr/local/lib/nbot/astrbot-healthcheck
   install -m 0755 "$SCRIPT_DIR/assets/bin/astrbotctl" /usr/local/bin/astrbotctl
   install -m 0644 "$SCRIPT_DIR/assets/systemd/astrbot.service" /etc/systemd/system/astrbot.service
   install -m 0644 "$SCRIPT_DIR/assets/systemd/astrbot-watchdog.service" /etc/systemd/system/astrbot-watchdog.service

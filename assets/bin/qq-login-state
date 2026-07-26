@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-source /etc/bot-stack.conf
-: "${SNOWLUMA_ROOT:=/bot-stack/snowluma}" "${SNOWLUMA_PAYLOAD_ROOT:=/bot-stack/payload/snowluma}"
+source /etc/nbot.conf
+: "${SNOWLUMA_ROOT:=/nbot/snowluma}" "${SNOWLUMA_PAYLOAD_ROOT:=/nbot/payload/snowluma}"
 node="$SNOWLUMA_PAYLOAD_ROOT/runtime/node"
 login_file="$SNOWLUMA_ROOT/config/QQ/auth/login.enc"
 [[ -x "$node" ]] || { echo unknown; exit 0; }

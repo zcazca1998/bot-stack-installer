@@ -18,7 +18,7 @@ case "$command" in
   qq-start) systemctl start snowluma-qq.service; systemctl --no-block start snowluma.service ;;
   qq-stop) systemctl stop snowluma.service snowluma-qq.service ;;
   qq-restart) systemctl stop snowluma.service; systemctl restart snowluma-qq.service; systemctl --no-block start snowluma.service ;;
-  qq-status) exec /usr/local/lib/bot-stack/qq-status ;;
+  qq-status) exec /usr/local/lib/nbot/qq-status ;;
   login) exec qqlogin ;;
   configure-onebot) exec nbot configure-onebot ;;
   update) exec nbot update-snowluma ;;

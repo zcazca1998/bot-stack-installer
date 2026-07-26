@@ -3,10 +3,10 @@ set -Eeuo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
-BOT_STACK_CONFIG="$tmp/bot-stack.conf"
+NBOT_CONFIG="$tmp/nbot.conf"
 source "$ROOT/lib/common.sh"
 
-BOT_STACK_HOME="$tmp/Stack Home"
+NBOT_HOME="$tmp/Stack Home"
 ASTRBOT_ROOT="$tmp/Astr Bot"
 SNOWLUMA_ROOT="$tmp/Snow Luma"
 SNOWLUMA_PAYLOAD_ROOT="$tmp/Payload Root"
@@ -17,10 +17,10 @@ SNOWLUMA_IMAGE_MIRROR='dockerproxy.net'
 SNOWLUMA_IMAGE_FALLBACK_MIRROR='docker.1ms.run'
 SNOWLUMA_IMAGE_PROXY='socks5h://127.0.0.1:20170'
 write_config
-unset BOT_STACK_HOME ASTRBOT_ROOT SNOWLUMA_ROOT SNOWLUMA_PAYLOAD_ROOT GITHUB_ACCESS GITHUB_PROXY
+unset NBOT_HOME ASTRBOT_ROOT SNOWLUMA_ROOT SNOWLUMA_PAYLOAD_ROOT GITHUB_ACCESS GITHUB_PROXY
 unset SNOWLUMA_IMAGE SNOWLUMA_IMAGE_MIRROR SNOWLUMA_IMAGE_FALLBACK_MIRROR SNOWLUMA_IMAGE_PROXY
-source "$BOT_STACK_CONFIG"
-[[ "$BOT_STACK_HOME" == "$tmp/Stack Home" ]]
+source "$NBOT_CONFIG"
+[[ "$NBOT_HOME" == "$tmp/Stack Home" ]]
 [[ "$ASTRBOT_ROOT" == "$tmp/Astr Bot" ]]
 [[ "$SNOWLUMA_ROOT" == "$tmp/Snow Luma" ]]
 [[ "$SNOWLUMA_PAYLOAD_ROOT" == "$tmp/Payload Root" ]]
