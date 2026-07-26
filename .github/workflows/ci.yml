@@ -148,7 +148,9 @@ jobs:
             sudo tee /etc/systemd/system/nbot-astrbot.service.d/break.conf >/dev/null
           sudo systemctl daemon-reload
           sudo systemctl reset-failed nbot-astrbot.service
-          sudo systemctl start nbot-astrbot.service || true
+          # 服务此刻正在运行，start 是空操作、daemon-reload 也不会重启它，
+          # 必须 restart 才能让坏掉的 drop-in 真正生效。
+          sudo systemctl restart nbot-astrbot.service || true
           for _ in $(seq 1 30); do
             state=$(systemctl is-active nbot-astrbot.service || true)
             [ "$state" = failed ] && break
