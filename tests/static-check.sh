@@ -124,6 +124,9 @@ grep -q 'NBOT_NONINTERACTIVE=1 "$TARGET/install.sh"' "$ROOT/bootstrap.sh"
 grep -q 'api.github.com' "$ROOT/bootstrap.sh"
 grep -q 'gh-proxy.com' "$ROOT/bootstrap.sh"
 grep -q 'NBOT_REPO:-' "$ROOT/bootstrap.sh"
+# tag 与分支都要能安装：写死 refs/heads 会让 NBOT_REF=v1.0.0 变成 404。
+grep -q 'NBOT_REF:-' "$ROOT/bootstrap.sh"
+! grep -q 'refs/heads' "$ROOT/bootstrap.sh"
 # Preflight checks must happen before downloading anything.
 grep -q 'uname -m' "$ROOT/bootstrap.sh"
 grep -q 'dpkg --print-architecture' "$ROOT/bootstrap.sh"

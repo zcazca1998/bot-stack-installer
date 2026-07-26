@@ -9,12 +9,14 @@
 # 环境变量：
 #   NBOT_REPO          仓库 owner/name，默认 zcazca1998/nbot（fork 可覆盖）
 #   NBOT_REPO_MIRRORS  逗号分隔的 GitHub 加速站，按序尝试（默认内置三个）
-#   NBOT_BRANCH        分支，默认 main
+#   NBOT_REF           分支或 tag，默认 main。填 tag（如 v1.0.0）可装到确定的
+#                      快照，便于复现安装或退回上个稳定版。
+#   NBOT_BRANCH        NBOT_REF 的旧名，仍然支持
 #   NBOT_ARGS          传给安装器的参数，默认 install-all；设为 menu 进入菜单
 set -Eeuo pipefail
 
 REPO_PATH=${NBOT_REPO:-zcazca1998/nbot}
-BRANCH=${NBOT_BRANCH:-main}
+REF=${NBOT_REF:-${NBOT_BRANCH:-main}}
 TARGET=/usr/local/lib/nbot/installer
 MIRRORS=${NBOT_REPO_MIRRORS:-https://gh-proxy.com,https://ghfast.top,https://ghproxy.net}
 
@@ -60,7 +62,9 @@ fi
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 archive="$work/nbot.tar.gz"
-direct="https://codeload.github.com/${REPO_PATH}/tar.gz/refs/heads/${BRANCH}"
+# tag 在 refs/tags 下，分支在 refs/heads 下；用不带前缀的形式让 GitHub
+# 自己解析，这样 NBOT_REF 既能填分支也能填 tag 或提交号。
+direct="https://codeload.github.com/${REPO_PATH}/tar.gz/${REF}"
 
 downloaded=0
 # 先探测能否快速直连 GitHub：海外机器直接下载，不必绕加速站。
