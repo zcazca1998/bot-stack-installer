@@ -14,6 +14,10 @@
 4. SnowLuma 应在 QQ 进程启动后立即进入被动观察，不应等账号登录后才启动；登录完成后 Hook 自动切换工作模式。
 5. 程序载荷与配置必须分离，更新镜像不能覆盖 QQ 登录态和 OneBot 配置。
 
+## 系统依赖
+
+1. Debian 13 / Ubuntu 24.04 因 time_t 过渡把 libasound2、libgtk-3-0、libatspi2.0-0 等改名为 t64 后缀；旧名成为虚拟包且可能有多个提供者，apt 会直接报 no installation candidate，必须显式回退到 t64 包名。
+
 ## 下载
 
 1. 国内直连 GitHub 和 Docker Hub 都可能长时间无进展。

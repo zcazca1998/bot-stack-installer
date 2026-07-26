@@ -58,15 +58,36 @@ detect_os() {
   esac
 }
 
+package_installed() {
+  dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q 'install ok installed'
+}
+
+apt_installable() {
+  apt-get install -s -y --no-install-recommends "$1" >/dev/null 2>&1
+}
+
 install_packages() {
-  local missing=() package
+  local missing=() resolved=() package
   for package in "$@"; do
-    dpkg-query -W -f='${Status}' "$package" 2>/dev/null | grep -q 'install ok installed' || missing+=("$package")
+    # Debian 13 / Ubuntu 24.04 renamed several libraries with a t64 suffix;
+    # treat either name as satisfying the dependency.
+    package_installed "$package" || package_installed "${package}t64" || missing+=("$package")
   done
   ((${#missing[@]} == 0)) && return 0
   info "安装系统依赖：${missing[*]}"
   apt-get update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${missing[@]}"
+  for package in "${missing[@]}"; do
+    if apt_installable "$package"; then
+      resolved+=("$package")
+    elif apt_installable "${package}t64"; then
+      info "使用 ${package}t64 替代 ${package}（time_t 过渡包名）"
+      resolved+=("${package}t64")
+    else
+      # Keep the original name so apt reports the real error.
+      resolved+=("$package")
+    fi
+  done
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "${resolved[@]}"
 }
 
 require_commands() {

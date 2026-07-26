@@ -37,6 +37,8 @@ grep -q 'prune_image_releases' "$ROOT/modules/snowluma.sh"
 grep -q 'astrbot-prepare.*usr/local/lib/bot-stack/astrbot-prepare' "$ROOT/modules/astrbot.sh"
 # astrbot.cli init prompts interactively; systemd has no stdin to answer with.
 grep -q "printf 'y" "$ROOT/assets/bin/astrbot-prepare"
+# Ubuntu 24.04 / Debian 13 renamed several libs with a t64 suffix.
+grep -q 't64' "$ROOT/lib/common-base.sh"
 grep -q 'python-build-standalone' "$ROOT/modules/astrbot.sh"
 grep -q 'release_id=.*RANDOM' "$ROOT/modules/snowluma.sh"
 
