@@ -2,34 +2,52 @@
 set -u
 source /etc/bot-stack.conf
 cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
-deadline=$(( $(date +%s) + 25 ))
+deadline=$(( $(date +%s) + 90 ))
+attempts=0
 
-while (( $(date +%s) < deadline )); do
-  state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
-  [[ "$state" == logged-in ]] && exit 0
-  [[ "$state" == quick-login && -r "$cgroup" ]] || { sleep 2; continue; }
-  xvfb_pid=
+resolve_xvfb() {
+  display= auth=
+  [[ -r "$cgroup" ]] || return 1
+  local pid xvfb_pid= args i
   while read -r pid; do
     [[ -r "/proc/$pid/comm" ]] || continue
     [[ $(<"/proc/$pid/comm") == Xvfb ]] && { xvfb_pid=$pid; break; }
   done < "$cgroup"
-  [[ -n "$xvfb_pid" ]] || { sleep 2; continue; }
+  [[ -n "$xvfb_pid" ]] || return 1
   mapfile -d '' -t args < "/proc/$xvfb_pid/cmdline"
-  display= auth=
   for ((i=0; i<${#args[@]}; i++)); do
     [[ ${args[$i]} =~ ^:[0-9]+$ ]] && display=${args[$i]}
     [[ ${args[$i]} == -auth ]] && auth=${args[$((i+1))]:-}
   done
-  [[ -n "$display" && -r "$auth" ]] || { sleep 2; continue; }
+  [[ -n "$display" && -r "$auth" ]]
+}
+
+while (( $(date +%s) < deadline )); do
+  state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+  [[ "$state" == logged-in ]] && exit 0
+  [[ "$state" == quick-login ]] || { sleep 2; continue; }
+  resolve_xvfb || { sleep 2; continue; }
   window=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null | tail -1 || true)
   [[ -n "$window" ]] || { sleep 2; continue; }
   geometry=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$window" 2>/dev/null || true)
   width=$(sed -n 's/^WIDTH=//p' <<<"$geometry")
   height=$(sed -n 's/^HEIGHT=//p' <<<"$geometry")
-  [[ "$width" == 320 && "$height" == 460 ]] || { sleep 2; continue; }
-  DISPLAY="$display" XAUTHORITY="$auth" xdotool mousemove --window "$window" 160 328 click 1
-  logger -t snowluma 'QQ quick-login button clicked once; waiting for login state'
-  exit 0
+  [[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]] || { sleep 2; continue; }
+  # 自适应：登录窗口按尺寸范围识别（与 qqlogin 一致），点击位置按比例换算。
+  # 高度 71% 即 320x460 布局中的快捷登录按钮；8 秒无反应换 66% 再试一次。
+  ((width >= 260 && width <= 520 && height >= 340 && height <= 650)) || { sleep 2; continue; }
+  case $attempts in
+    0) y=$((height * 71 / 100)) ;;
+    1) y=$((height * 66 / 100)) ;;
+    *) break ;;
+  esac
+  DISPLAY="$display" XAUTHORITY="$auth" xdotool mousemove --window "$window" $((width / 2)) "$y" click 1
+  attempts=$((attempts + 1))
+  logger -t snowluma "QQ quick-login click attempt ${attempts} at $((width / 2)),${y} in ${width}x${height} window"
+  sleep 8
 done
+
+state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+[[ "$state" == logged-in ]] && exit 0
 logger -t snowluma 'No safe QQ quick-login action was available; manual qqlogin may be required'
 exit 0

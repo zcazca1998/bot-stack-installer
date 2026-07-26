@@ -26,6 +26,10 @@ grep -q 'cols < 74 || lines < 40' "$ROOT/assets/bin/qqlogin"
 ! grep -q 'xvfb-run' "$ROOT/assets/bin/qq-launch"
 ! grep -q '^ExecStartPost=' "$ROOT/assets/systemd/snowluma-qq.service"
 grep -q 'qq-auto-login &$' "$ROOT/assets/bin/qq-launch"
+# Quick-login clicks must be proportional with a generous startup budget.
+grep -q 'height \* 71 / 100' "$ROOT/assets/bin/qq-auto-login"
+grep -q '+ 90' "$ROOT/assets/bin/qq-auto-login"
+! grep -q '160 328' "$ROOT/assets/bin/qq-auto-login"
 grep -q 'exec "$executable"' "$ROOT/assets/bin/qq-launch"
 grep -q 'xvfb_ok' "$ROOT/assets/bin/snowluma-healthcheck"
 
