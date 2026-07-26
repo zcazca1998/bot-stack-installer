@@ -254,6 +254,68 @@ install_qq() {
   install_snowluma
 }
 
+snowluma_other_release() {
+  # 载荷目录只保留当前和上一个 image-* release，所以「另一个」就是回滚目标。
+  local parent=$1 current release
+  current=$(readlink -f "$2" 2>/dev/null || true)
+  while IFS= read -r release; do
+    [[ "$(readlink -f "$release")" != "$current" ]] && { printf '%s
+' "$release"; return 0; }
+  done < <(find "$parent" -mindepth 1 -maxdepth 1 -type d -name 'image-*' 2>/dev/null | sort -r)
+  return 1
+}
+
+show_snowluma_version() {
+  local current other
+  current=$(readlink -f "$SNOWLUMA_ROOT/app" 2>/dev/null || true)
+  if [[ -z "$current" ]]; then
+    info "SnowLuma 尚未安装。"
+    return 0
+  fi
+  info "当前版本：$(basename "$current")"
+  [[ ! -r "$current/.image-source" ]] ||
+    info "  镜像来源：$(<"$current/.image-source")"
+  if other=$(snowluma_other_release "$SNOWLUMA_PAYLOAD_ROOT/releases" "$SNOWLUMA_ROOT/app"); then
+    info "可回滚到：$(basename "$other")"
+    info "  执行 nbot snowluma rollback 即可退回，无需知道版本号。"
+  else
+    info "可回滚到：无（尚未经历过一次更新）"
+  fi
+}
+
+rollback_snowluma() {
+  # 程序载荷是软链接切换，回滚只需把链接指回另一个 release；配置、缓存和
+  # QQ 登录态不在版本目录里，所以回滚不会丢数据。
+  local snow_target qq_target old_app old_qq
+  snow_target=$(snowluma_other_release "$SNOWLUMA_PAYLOAD_ROOT/releases" "$SNOWLUMA_ROOT/app") ||
+    die "没有可回滚的 SnowLuma 版本（需要先经历一次 nbot snowluma update）。"
+  qq_target=$(snowluma_other_release "$SNOWLUMA_PAYLOAD_ROOT/qq/releases" "$SNOWLUMA_ROOT/qq/current") || qq_target=
+
+  old_app=$(readlink -f "$SNOWLUMA_ROOT/app")
+  old_qq=$(readlink -f "$SNOWLUMA_ROOT/qq/current" 2>/dev/null || true)
+  info "准备回滚：$(basename "$old_app") -> $(basename "$snow_target")"
+  [[ -z "$qq_target" ]] || info "  QQ：$(basename "${old_qq:-无}") -> $(basename "$qq_target")"
+  nbot_interactive && { confirm "确认回滚 SnowLuma 与 QQ？" Y || return 0; }
+
+  systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
+  atomic_symlink "$snow_target" "$SNOWLUMA_ROOT/app"
+  [[ -z "$qq_target" ]] || atomic_symlink "$qq_target" "$SNOWLUMA_ROOT/qq/current"
+  systemctl start nbot-qq.service || true
+  systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
+  sleep 8
+  if ! systemctl is-active --quiet nbot-qq.service; then
+    warn "回滚后的版本未能启动，正在切回原版本。"
+    systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
+    atomic_symlink "$old_app" "$SNOWLUMA_ROOT/app"
+    [[ -z "$old_qq" ]] || atomic_symlink "$old_qq" "$SNOWLUMA_ROOT/qq/current"
+    systemctl start nbot-qq.service 2>/dev/null || true
+    systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
+    die "回滚失败，已恢复到 $(basename "$old_app")。"
+  fi
+  info "已回滚到 $(basename "$snow_target")。再次执行 nbot snowluma rollback 可切回。"
+}
+
+
 snowluma_webui_auth_file() { printf '%s/data/config/webui.json
 ' "$SNOWLUMA_ROOT"; }
 

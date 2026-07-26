@@ -230,6 +230,14 @@ grep -q 'set-password)' "$ROOT/install-core.sh"
 grep -q 'reverse_proxy 127.0.0.1' "$ROOT/modules/caddy.sh"
 # IP access sends no SNI; an explicit self-signed cert must be used.
 grep -q 'novnc-selfsigned' "$ROOT/modules/caddy.sh"
+# 回滚：上游坏版本时用户不必知道版本号，安装器必须留着上一版。
+grep -q 'rollback_astrbot()' "$ROOT/modules/astrbot.sh"
+grep -q 'rollback_snowluma()' "$ROOT/modules/snowluma.sh"
+grep -q '\.app\.previous' "$ROOT/modules/astrbot.sh"
+! grep -q 'rm -rf "\$old_app" "\$old_venv"$' "$ROOT/modules/astrbot.sh"
+grep -q 'rollback)' "$ROOT/install-core.sh"
+grep -q 'nbot astrbot rollback' "$ROOT/README.md"
+
 # 许可与版本号是发布的前提。
 [[ -f "$ROOT/LICENSE" ]]
 grep -q 'GNU GENERAL PUBLIC LICENSE' "$ROOT/LICENSE"

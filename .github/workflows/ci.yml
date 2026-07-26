@@ -53,6 +53,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
+      - name: Point data roots at /mnt
+        run: |
+          sudo tee /etc/nbot.conf >/dev/null <<'EOF'
+          NBOT_HOME=/mnt/nbot
+          ASTRBOT_ROOT=/mnt/nbot/astrbot
+          SNOWLUMA_ROOT=/mnt/nbot/snowluma
+          SNOWLUMA_PAYLOAD_ROOT=/mnt/nbot/payload/snowluma
+          EOF
+          sudo chmod 600 /etc/nbot.conf
       - name: Install AstrBot end to end
         run: sudo ./install.sh install-astrbot
       - name: Verify service and WebUI
@@ -72,6 +81,35 @@ jobs:
           sudo nbot astrbot webui | tee /tmp/webui.txt
           grep -q 'AstrBot WebUI' /tmp/webui.txt
           ! grep -q 'astrbot / astrbot' /tmp/webui.txt
+      - name: Version and rollback behaviour
+        run: |
+          sudo nbot astrbot version | tee /tmp/ver.txt
+          grep -q '当前版本' /tmp/ver.txt
+          # 首次安装还没有上一版，回滚必须明确拒绝而不是弄坏现有安装。
+          if sudo nbot astrbot rollback 2>/tmp/rb.txt; then
+            echo 'rollback should have refused with no previous version' >&2
+            exit 1
+          fi
+          grep -q '没有可回滚的版本' /tmp/rb.txt
+          systemctl is-active nbot-astrbot.service
+          # 再装一次以产生上一版，然后验证回滚双向可用。
+          sudo ./install.sh install-astrbot
+          test -d /mnt/nbot/astrbot/.app.previous
+          before=$(sudo cat /mnt/nbot/astrbot/app/.nbot-version)
+          sudo nbot astrbot rollback
+          systemctl is-active nbot-astrbot.service
+          after=$(sudo cat /mnt/nbot/astrbot/app/.nbot-version)
+          echo "rollback: $before -> $after"
+          # 回滚后仍要能提供服务，且能再切回来。
+          for _ in $(seq 1 30); do
+            curl -fsS -o /dev/null http://127.0.0.1:6185/ && break
+            sleep 2
+          done
+          curl -fsS -o /dev/null http://127.0.0.1:6185/
+          sudo nbot astrbot rollback
+          again=$(sudo cat /mnt/nbot/astrbot/app/.nbot-version)
+          [ "$again" = "$before" ]
+          systemctl is-active nbot-astrbot.service
       - name: Reset the WebUI password with an explicit value
         run: |
           sudo NBOT_ASTRBOT_PASSWORD='CiTestPass123' nbot astrbot set-password

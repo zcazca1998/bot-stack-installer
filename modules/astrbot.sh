@@ -98,14 +98,74 @@ install_astrbot() {
     journalctl -u nbot-astrbot.service -n 80 --no-pager
     die "AstrBot 更新失败，已尝试恢复旧版本。"
   fi
-  rm -rf "$old_app" "$old_venv"
+  # 保留上一个版本，供 nbot astrbot rollback 使用：上游发了坏版本时用户
+  # 无需知道版本号，一条命令退回刚才还能用的那一版。
+  rm -rf "$ASTRBOT_ROOT/.app.previous" "$ASTRBOT_ROOT/.venv.previous"
+  [[ ! -d "$old_app" ]] || mv "$old_app" "$ASTRBOT_ROOT/.app.previous"
+  [[ ! -d "$old_venv" ]] || mv "$old_venv" "$ASTRBOT_ROOT/.venv.previous"
   info "AstrBot ${tag} 已启动。WebUI: http://服务器IP:${ASTRBOT_PORT}"
+  [[ ! -d "$ASTRBOT_ROOT/.app.previous" ]] ||
+    info "上一版本已保留，出问题可执行：nbot astrbot rollback"
   rm -rf "$build"
   build=
   trap - EXIT
 }
 
 astrbot_config_file() { printf '%s/data/cmd_config.json\n' "$ASTRBOT_ROOT"; }
+
+astrbot_installed_version() {
+  local file=$1/.nbot-version
+  [[ -r "$file" ]] && head -n1 "$file" || printf 'unknown\n'
+}
+
+show_astrbot_version() {
+  info "当前版本：$(astrbot_installed_version "$ASTRBOT_ROOT/app")"
+  if [[ -d "$ASTRBOT_ROOT/.app.previous" ]]; then
+    info "可回滚到：$(astrbot_installed_version "$ASTRBOT_ROOT/.app.previous")"
+    info "  执行 nbot astrbot rollback 即可退回，无需知道版本号。"
+  else
+    info "可回滚到：无（尚未经历过一次更新）"
+  fi
+}
+
+rollback_astrbot() {
+  # 用户无法预知上游哪个版本有 bug，所以不要求他记版本号：直接换回
+  # 上次更新前那一版，同时把当前版本留作再次切换的备份。
+  local prev_app="$ASTRBOT_ROOT/.app.previous" prev_venv="$ASTRBOT_ROOT/.venv.previous"
+  [[ -d "$prev_app" && -d "$prev_venv" ]] ||
+    die "没有可回滚的版本（需要先经历一次 nbot astrbot update）。"
+  local current previous
+  current=$(astrbot_installed_version "$ASTRBOT_ROOT/app")
+  previous=$(astrbot_installed_version "$prev_app")
+  info "准备回滚：${current} -> ${previous}"
+  nbot_interactive && { confirm "确认回滚 AstrBot？" Y || return 0; }
+
+  systemctl stop nbot-astrbot.service 2>/dev/null || true
+  # 交换而非覆盖：回滚后仍能再切回来，避免单向操作把人锁死。
+  mv "$ASTRBOT_ROOT/app" "$ASTRBOT_ROOT/.app.swap"
+  mv "$ASTRBOT_ROOT/.venv" "$ASTRBOT_ROOT/.venv.swap"
+  mv "$prev_app" "$ASTRBOT_ROOT/app"
+  mv "$prev_venv" "$ASTRBOT_ROOT/.venv"
+  mv "$ASTRBOT_ROOT/.app.swap" "$prev_app"
+  mv "$ASTRBOT_ROOT/.venv.swap" "$prev_venv"
+
+  systemctl start nbot-astrbot.service || true
+  sleep 5
+  if ! systemctl is-active --quiet nbot-astrbot.service; then
+    journalctl -u nbot-astrbot.service -n 40 --no-pager
+    warn "回滚后的版本也未能启动，正在切回原版本。"
+    systemctl stop nbot-astrbot.service 2>/dev/null || true
+    mv "$ASTRBOT_ROOT/app" "$ASTRBOT_ROOT/.app.swap"
+    mv "$ASTRBOT_ROOT/.venv" "$ASTRBOT_ROOT/.venv.swap"
+    mv "$prev_app" "$ASTRBOT_ROOT/app"
+    mv "$prev_venv" "$ASTRBOT_ROOT/.venv"
+    mv "$ASTRBOT_ROOT/.app.swap" "$prev_app"
+    mv "$ASTRBOT_ROOT/.venv.swap" "$prev_venv"
+    systemctl start nbot-astrbot.service 2>/dev/null || true
+    die "回滚失败，已恢复到 ${current}。"
+  fi
+  info "已回滚到 ${previous}。再次执行 nbot astrbot rollback 可切回 ${current}。"
+}
 
 show_astrbot_webui() {
   # v4.24.4 起首次启动随机生成 24 位密码并打印到日志，不再是 astrbot/astrbot。

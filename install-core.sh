@@ -309,6 +309,18 @@ service_command() {
         novnc) set_vnc_password ;;
         *) die "$group 不支持密码重置" ;;
       esac ;;
+    rollback)
+      case "$group" in
+        astrbot) rollback_astrbot ;;
+        snowluma|qq) rollback_snowluma ;;
+        *) die "$group 不支持回滚" ;;
+      esac ;;
+    version)
+      case "$group" in
+        astrbot) show_astrbot_version ;;
+        snowluma|qq) show_snowluma_version ;;
+        *) die "$group 不支持 version" ;;
+      esac ;;
     webui)
       case "$group" in
         snowluma) show_snowluma_webui ;;
@@ -328,7 +340,7 @@ service_command() {
       if [[ "$group" == novnc ]]; then
         die "用法: nbot novnc {start|stop|restart|status|logs|update|url|password|set-password|proxy-example}"
       fi
-      die "用法: nbot $group {start|stop|restart|status|logs|update}" ;;
+      die "用法: nbot $group {start|stop|restart|status|logs|update|version|rollback}" ;;
   esac
 }
 
@@ -363,6 +375,8 @@ QQ 登录
       nbot snowluma update          重新拆镜像更新 SnowLuma + QQ
   WebUI 地址：nbot astrbot webui | snowluma webui | novnc url
   重置密码：  nbot astrbot set-password | snowluma set-password | caddy set-auth
+  版本回滚：  nbot astrbot version | rollback     nbot snowluma version | rollback
+              上游发了坏版本时直接 rollback 退回上一版，不必知道版本号
   noVNC 专属：nbot novnc url | password | set-password | proxy-example
   Caddy：     nbot caddy set-auth | status | restart | logs
 

@@ -72,7 +72,7 @@ cd nbot && sudo ./install.sh
 四个组件 `astrbot`、`snowluma`、`qq`、`novnc` 共用同一套动作：
 
 ~~~bash
-nbot <组件> start|stop|restart|status|logs|update
+nbot <组件> start|stop|restart|status|logs|update|version|rollback
 ~~~
 
 | 示例 | 说明 |
@@ -82,6 +82,26 @@ nbot <组件> start|stop|restart|status|logs|update
 | `nbot astrbot logs -n 200` | 查看最近 200 行 |
 | `nbot qq restart` | 重启 QQ（会先停 SnowLuma，避免 Hook 悬空） |
 | `nbot snowluma update` | 重新拆镜像更新 SnowLuma + QQ |
+| `nbot astrbot version` | 显示当前版本与可回滚的版本 |
+| `nbot astrbot rollback` | 退回上一个版本（**不必知道版本号**） |
+| `nbot snowluma rollback` | 退回上一个 SnowLuma + QQ 载荷 |
+
+### 上游发了坏版本怎么办
+
+安装器默认装最新版，但**每次更新都会留着上一个版本**，所以不需要你事先知道
+哪个版本有 bug：
+
+~~~bash
+nbot astrbot version     # 看当前版本和可退回的版本
+nbot astrbot rollback    # 直接退回上一版
+~~~
+
+回滚是**双向切换**：再执行一次 `rollback` 就切回去，不会把自己锁死。
+新版本装不起来时安装器本来就会自动恢复旧版；`rollback` 解决的是
+「装起来了但用着有问题」这种情况。
+
+SnowLuma 的回滚只切程序载荷的软链接，配置、缓存和 QQ 登录态都不在版本目录里，
+所以回滚不会丢登录态、不用重新扫码。
 
 noVNC 与 Caddy 另有专属动作：
 
