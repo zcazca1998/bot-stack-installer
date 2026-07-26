@@ -14,6 +14,12 @@ SNOWLUMA_WEBUI_PORT=${SNOWLUMA_WEBUI_PORT:-5099}
 ONEBOT_HTTP_PORT=${ONEBOT_HTTP_PORT:-3005}
 GITHUB_PROXY=${GITHUB_PROXY:-}
 GITHUB_ACCESS=${GITHUB_ACCESS:-auto}
+# GitHub 下载加速前缀（国内直连常年不通）。按顺序尝试，全部失败后直连。
+# 留空表示不使用加速镜像。
+GITHUB_MIRRORS=${GITHUB_MIRRORS:-https://ghfast.top,https://gh-proxy.com,https://ghproxy.net}
+# pip 索引（AstrBot 依赖数百 MB，国内直连 PyPI 基本不可用）。
+PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
+PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.aliyun.com}
 SNOWLUMA_IMAGE=${SNOWLUMA_IMAGE:-motricseven7/snowluma:latest}
 SNOWLUMA_IMAGE_MIRROR=${SNOWLUMA_IMAGE_MIRROR:-dockerproxy.net}
 SNOWLUMA_IMAGE_FALLBACK_MIRROR=${SNOWLUMA_IMAGE_FALLBACK_MIRROR:-docker.1ms.run}
@@ -123,10 +129,20 @@ download() {
   curl "${CURL_ARGS[@]}" --output "$output" "$url"
 }
 
+mirrored_github_url() {
+  # 加速站只代理下载类地址（release 资产、archive、raw），API 不适用。
+  local prefix=${1%/} url=$2
+  case "$url" in
+    https://github.com/*|https://raw.githubusercontent.com/*|https://codeload.github.com/*)
+      printf '%s/%s\n' "$prefix" "$url" ;;
+    *) return 1 ;;
+  esac
+}
+
 github_fetch() {
   # Always download into a file: emitting a partial proxy response to stdout
   # and then retrying directly would concatenate two bodies.
-  local url=$1 output=${2:-} temp= rc=1
+  local url=$1 output=${2:-} temp= rc=1 mirror mirror_url
   curl_args
   if [[ -z "$output" ]]; then
     temp=$(mktemp)
@@ -140,6 +156,21 @@ github_fetch() {
     else
       warn "GitHub proxy failed."
     fi
+  fi
+
+  # 代理不可用时先走国内加速站，再直连。
+  if ((rc != 0)) && [[ "$GITHUB_ACCESS" != proxy && -n "$GITHUB_MIRRORS" ]]; then
+    local IFS=,
+    for mirror in $GITHUB_MIRRORS; do
+      [[ -n "$mirror" ]] || continue
+      mirror_url=$(mirrored_github_url "$mirror" "$url") || continue
+      info "Trying GitHub mirror: $mirror_url" >&2
+      if curl "${CURL_ARGS[@]}" --output "$output" "$mirror_url"; then
+        rc=0
+        break
+      fi
+    done
+    unset IFS
   fi
 
   if ((rc != 0)) && [[ "$GITHUB_ACCESS" != proxy ]]; then
@@ -227,6 +258,9 @@ write_config() {
     printf 'ONEBOT_HTTP_PORT=%q\n' "$ONEBOT_HTTP_PORT"
     printf 'GITHUB_PROXY=%q\n' "$GITHUB_PROXY"
     printf 'GITHUB_ACCESS=%q\n' "$GITHUB_ACCESS"
+    printf 'GITHUB_MIRRORS=%q\n' "$GITHUB_MIRRORS"
+    printf 'PIP_INDEX_URL=%q\n' "$PIP_INDEX_URL"
+    printf 'PIP_TRUSTED_HOST=%q\n' "$PIP_TRUSTED_HOST"
     printf 'SNOWLUMA_IMAGE=%q\n' "$SNOWLUMA_IMAGE"
     printf 'SNOWLUMA_IMAGE_MIRROR=%q\n' "$SNOWLUMA_IMAGE_MIRROR"
     printf 'SNOWLUMA_IMAGE_FALLBACK_MIRROR=%q\n' "$SNOWLUMA_IMAGE_FALLBACK_MIRROR"

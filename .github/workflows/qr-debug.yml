@@ -32,7 +32,7 @@ jobs:
         run: sudo ./install.sh install-snowluma
       - name: Show stack status
         run: |
-          systemctl is-active astrbot.service snowluma-qq.service snowluma.service || true
+          systemctl is-active nbot-astrbot.service nbot-qq.service nbot-snowluma.service || true
           sudo /usr/local/lib/nbot/qq-status || true
           echo '连上 SSH 后执行: sudo qqlogin  (终端窗口至少 74 列 x 40 行)'
           echo '登录后配置对接: sudo nbot configure-onebot'

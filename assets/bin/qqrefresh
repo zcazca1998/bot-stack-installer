@@ -6,7 +6,7 @@ case "${1:-}" in
   -q|--quiet) quiet=1 ;;
   *) echo 'Usage: qqrefresh [-q]' >&2; exit 2 ;;
 esac
-cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+cgroup=/sys/fs/cgroup/system.slice/nbot-qq.service/cgroup.procs
 [[ -r "$cgroup" ]] || { echo 'SnowLuma QQ cgroup is unavailable' >&2; exit 1; }
 xvfb_pid=
 while read -r pid; do

@@ -54,7 +54,7 @@ jobs:
         run: sudo ./install.sh install-astrbot
       - name: Verify service and WebUI
         run: |
-          systemctl is-active astrbot.service
+          systemctl is-active nbot-astrbot.service
           for _ in $(seq 1 30); do
             if curl -fsS -o /dev/null http://127.0.0.1:6185/; then exit 0; fi
             sleep 2
@@ -67,7 +67,7 @@ jobs:
           sudo nbot doctor
       - name: Logs on failure
         if: failure()
-        run: sudo journalctl -u astrbot.service -n 200 --no-pager || true
+        run: sudo journalctl -u nbot-astrbot.service -n 200 --no-pager || true
 
   full-stack:
     if: github.event_name == 'workflow_dispatch' && inputs.full_stack
@@ -90,7 +90,7 @@ jobs:
         run: sudo ./install.sh install-snowluma
       - name: Verify QQ and SnowLuma services
         run: |
-          systemctl is-active snowluma-qq.service snowluma.service
+          systemctl is-active nbot-qq.service nbot-snowluma.service
           sudo /usr/local/lib/nbot/qq-status || true
       - name: Install noVNC (defaults, decline Caddy prompt)
         run: printf '\n\nn\n' | sudo ./install.sh install-novnc
@@ -103,7 +103,7 @@ jobs:
       - name: Logs on failure
         if: failure()
         run: |
-          sudo journalctl -u snowluma-qq.service -u snowluma.service \
-            -u snowluma-vnc.service -u snowluma-novnc.service -u caddy.service \
+          sudo journalctl -u nbot-qq.service -u nbot-snowluma.service \
+            -u nbot-vnc.service -u nbot-novnc.service -u caddy.service \
             -n 300 --no-pager || true
           df -h || true

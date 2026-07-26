@@ -1,7 +1,7 @@
 [Unit]
 Description=x11vnc bridge for the QQ Xvfb display (127.0.0.1 only)
-After=snowluma-qq.service
-PartOf=snowluma-qq.service
+After=nbot-qq.service
+PartOf=nbot-qq.service
 
 [Service]
 Type=simple
@@ -15,4 +15,4 @@ TimeoutStopSec=15
 UMask=0077
 
 [Install]
-WantedBy=snowluma-qq.service
+WantedBy=nbot-qq.service

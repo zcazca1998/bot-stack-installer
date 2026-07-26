@@ -2,11 +2,11 @@
 set -Eeuo pipefail
 source /etc/nbot.conf
 : "${ASTRBOT_PORT:=6185}"
-failures=/run/astrbot-watchdog.failures
-grace=/run/astrbot-watchdog.grace
+failures=/run/nbot-astrbot-watchdog.failures
+grace=/run/nbot-astrbot-watchdog.grace
 
-systemctl is-active --quiet astrbot.service || { rm -f "$failures" "$grace"; exit 0; }
-pid=$(systemctl show astrbot.service -p MainPID --value)
+systemctl is-active --quiet nbot-astrbot.service || { rm -f "$failures" "$grace"; exit 0; }
+pid=$(systemctl show nbot-astrbot.service -p MainPID --value)
 [[ "$pid" =~ ^[1-9][0-9]*$ ]] || exit 0
 now=$(date +%s)
 read -r grace_pid grace_time < "$grace" 2>/dev/null || { grace_pid=; grace_time=0; }
@@ -25,7 +25,7 @@ fi
 if [[ -r "$failures" ]]; then count=$(<"$failures"); else count=0; fi
 count=$((count + 1)); printf '%s\n' "$count" > "$failures"
 if ((count >= 3)); then
-  logger -t astrbot-watchdog "WebUI ${ASTRBOT_PORT} failed 3 checks while process ${pid} stayed alive; restarting hung service"
+  logger -t nbot-astrbot-watchdog "WebUI ${ASTRBOT_PORT} failed 3 checks while process ${pid} stayed alive; restarting hung service"
   rm -f "$failures" "$grace"
-  systemctl restart astrbot.service
+  systemctl restart nbot-astrbot.service
 fi

@@ -39,7 +39,7 @@ install_managed_python() {
   trap - EXIT
 }
 install_astrbot() {
-  local tag archive build app_new venv_new old_app old_venv
+  local tag archive build app_new venv_new old_app old_venv pip_args
   install_packages ca-certificates curl git jq build-essential
   find_python || install_managed_python
   tag=$(github_latest_tag AstrBotDevs/AstrBot)
@@ -56,13 +56,23 @@ install_astrbot() {
   mkdir -p "$app_new"
   tar -xzf "$archive" --strip-components=1 -C "$app_new"
   "$PYTHON_BIN" -m venv "$venv_new"
-  "$venv_new/bin/python" -m pip install --upgrade pip setuptools wheel
-  "$venv_new/bin/python" -m pip install -r "$app_new/requirements.txt"
+  # 国内直连 PyPI 基本不可用，默认走镜像；镜像失败再回退官方源。
+  pip_args=()
+  if [[ -n "$PIP_INDEX_URL" ]]; then
+    pip_args=(--index-url "$PIP_INDEX_URL")
+    [[ -z "$PIP_TRUSTED_HOST" ]] || pip_args+=(--trusted-host "$PIP_TRUSTED_HOST")
+  fi
+  "$venv_new/bin/python" -m pip install "${pip_args[@]}" --upgrade pip setuptools wheel ||
+    "$venv_new/bin/python" -m pip install --upgrade pip setuptools wheel
+  if ! "$venv_new/bin/python" -m pip install "${pip_args[@]}" -r "$app_new/requirements.txt"; then
+    warn "镜像源安装依赖失败，回退官方 PyPI。"
+    "$venv_new/bin/python" -m pip install -r "$app_new/requirements.txt"
+  fi
   printf '%s\n' "$tag" > "$app_new/.nbot-version"
 
   install_runtime_assets
   install_astrbot_units
-  systemctl stop astrbot.service 2>/dev/null || true
+  systemctl stop nbot-astrbot.service 2>/dev/null || true
   old_app="${ASTRBOT_ROOT}/.app.rollback"
   old_venv="${ASTRBOT_ROOT}/.venv.rollback"
   rm -rf "$old_app" "$old_venv"
@@ -73,19 +83,19 @@ install_astrbot() {
   chown -R root:root "$ASTRBOT_ROOT/app" "$ASTRBOT_ROOT/.venv"
 
   systemctl daemon-reload
-  systemctl enable astrbot.service astrbot-watchdog.timer >/dev/null
+  systemctl enable nbot-astrbot.service nbot-astrbot-watchdog.timer >/dev/null
   # A start failure must fall through to the rollback below, not kill the
   # script via set -e before it can restore the previous version.
-  systemctl start astrbot.service astrbot-watchdog.timer || true
+  systemctl start nbot-astrbot.service nbot-astrbot-watchdog.timer || true
   sleep 5
-  if ! systemctl is-active --quiet astrbot.service; then
+  if ! systemctl is-active --quiet nbot-astrbot.service; then
     warn "新版本未能启动，正在回滚。"
-    systemctl stop astrbot.service 2>/dev/null || true
+    systemctl stop nbot-astrbot.service 2>/dev/null || true
     rm -rf "$ASTRBOT_ROOT/app" "$ASTRBOT_ROOT/.venv"
     [[ ! -d "$old_app" ]] || mv "$old_app" "$ASTRBOT_ROOT/app"
     [[ ! -d "$old_venv" ]] || mv "$old_venv" "$ASTRBOT_ROOT/.venv"
-    systemctl start astrbot.service 2>/dev/null || true
-    journalctl -u astrbot.service -n 80 --no-pager
+    systemctl start nbot-astrbot.service 2>/dev/null || true
+    journalctl -u nbot-astrbot.service -n 80 --no-pager
     die "AstrBot 更新失败，已尝试恢复旧版本。"
   fi
   rm -rf "$old_app" "$old_venv"
@@ -100,9 +110,8 @@ install_astrbot_units() {
   install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-prepare" /usr/local/lib/nbot/astrbot-prepare
   install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-launch" /usr/local/lib/nbot/astrbot-launch
   install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-healthcheck" /usr/local/lib/nbot/astrbot-healthcheck
-  install -m 0755 "$SCRIPT_DIR/assets/bin/astrbotctl" /usr/local/bin/astrbotctl
-  install -m 0644 "$SCRIPT_DIR/assets/systemd/astrbot.service" /etc/systemd/system/astrbot.service
-  install -m 0644 "$SCRIPT_DIR/assets/systemd/astrbot-watchdog.service" /etc/systemd/system/astrbot-watchdog.service
-  install -m 0644 "$SCRIPT_DIR/assets/systemd/astrbot-watchdog.timer" /etc/systemd/system/astrbot-watchdog.timer
+  install -m 0644 "$SCRIPT_DIR/assets/systemd/nbot-astrbot.service" /etc/systemd/system/nbot-astrbot.service
+  install -m 0644 "$SCRIPT_DIR/assets/systemd/nbot-astrbot-watchdog.service" /etc/systemd/system/nbot-astrbot-watchdog.service
+  install -m 0644 "$SCRIPT_DIR/assets/systemd/nbot-astrbot-watchdog.timer" /etc/systemd/system/nbot-astrbot-watchdog.timer
   systemctl daemon-reload
 }

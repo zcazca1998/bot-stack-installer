@@ -2,7 +2,7 @@
 
 install_novnc_units() {
   local unit
-  for unit in snowluma-vnc.service snowluma-novnc.service; do
+  for unit in nbot-vnc.service nbot-novnc.service; do
     install -m 0644 "$SCRIPT_DIR/assets/systemd/$unit" "/etc/systemd/system/$unit"
   done
   systemctl daemon-reload
@@ -69,22 +69,22 @@ install_novnc() {
   install_runtime_assets
   install_novnc_units
   write_novnc_proxy_example
-  systemctl enable snowluma-vnc.service snowluma-novnc.service >/dev/null
-  systemctl restart snowluma-novnc.service
-  if systemctl is-active --quiet snowluma-qq.service; then
-    systemctl restart snowluma-vnc.service
+  systemctl enable nbot-vnc.service nbot-novnc.service >/dev/null
+  systemctl restart nbot-novnc.service
+  if systemctl is-active --quiet nbot-qq.service; then
+    systemctl restart nbot-vnc.service
   else
-    info "snowluma-qq.service 未运行；VNC 桥接会随 QQ 服务一起启动。"
+    info "nbot-qq.service 未运行；VNC 桥接会随 QQ 服务一起启动。"
   fi
   sleep 2
-  if ! systemctl is-active --quiet snowluma-novnc.service; then
-    journalctl -u snowluma-novnc.service -n 40 --no-pager
+  if ! systemctl is-active --quiet nbot-novnc.service; then
+    journalctl -u nbot-novnc.service -n 40 --no-pager
     die "noVNC web 服务启动失败。"
   fi
 
   info "noVNC 已就绪：http://127.0.0.1:${NOVNC_PORT}/vnc.html（仅监听本机）"
-  info "VNC 密码：$(<"$passwd_file")（novncctl password 可再次查看）"
-  info "反向代理示例：/usr/local/lib/nbot/novnc-proxy.example（novncctl proxy-example 查看）"
+  info "VNC 密码：$(<"$passwd_file")（nbot novnc password 可再次查看）"
+  info "反向代理示例：/usr/local/lib/nbot/novnc-proxy.example（nbot novnc proxy-example 查看）"
   warn "noVNC 可完全操作 QQ 会话，务必在反向代理上叠加 HTTPS 与鉴权后再暴露。"
 
   if confirm "现在让安装器接管 Caddy（自动安装并生成 HTTPS + 登录配置）吗？" Y; then

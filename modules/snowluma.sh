@@ -7,9 +7,8 @@ install_runtime_assets() {
   for file in "$SCRIPT_DIR"/assets/bin/*; do
     install -m 0755 "$file" "/usr/local/lib/nbot/$(basename "$file")"
   done
-  for file in snowlumactl qqlogin qqrefresh astrbotctl novncctl; do
-    install -m 0755 "$SCRIPT_DIR/assets/bin/$file" "/usr/local/bin/$file"
-  done
+  # 控制命令统一为 nbot 子命令；清理旧的独立入口。
+  rm -f /usr/local/bin/snowlumactl /usr/local/bin/astrbotctl         /usr/local/bin/novncctl /usr/local/bin/qqlogin /usr/local/bin/qqrefresh
   # 日志限制：logrotate 轮转 + 每日清理定时器 + 可选 journald 总量上限。
   install -m 0644 "$SCRIPT_DIR/assets/systemd/nbot-logclean.service" /etc/systemd/system/nbot-logclean.service
   install -m 0644 "$SCRIPT_DIR/assets/systemd/nbot-logclean.timer" /etc/systemd/system/nbot-logclean.timer
@@ -210,27 +209,27 @@ install_snowluma() {
 
   install_runtime_assets
   install_snowluma_units
-  systemctl stop snowluma.service snowluma-qq.service 2>/dev/null || true
+  systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
   systemctl daemon-reload
-  systemctl enable snowluma-qq.service snowluma.service snowluma-watchdog.timer >/dev/null
-  systemctl start snowluma-qq.service || start_failed=1
+  systemctl enable nbot-qq.service nbot-snowluma.service nbot-snowluma-watchdog.timer >/dev/null
+  systemctl start nbot-qq.service || start_failed=1
   if ((start_failed == 0)); then
-    systemctl start snowluma.service || start_failed=1
+    systemctl start nbot-snowluma.service || start_failed=1
   fi
   if ((start_failed == 0)); then
-    systemctl start snowluma-watchdog.timer || start_failed=1
+    systemctl start nbot-snowluma-watchdog.timer || start_failed=1
   fi
   sleep 8
 
   if ((start_failed != 0)) ||
-     ! systemctl is-active --quiet snowluma-qq.service ||
-     ! systemctl is-active --quiet snowluma.service; then
+     ! systemctl is-active --quiet nbot-qq.service ||
+     ! systemctl is-active --quiet nbot-snowluma.service; then
     warn "Extracted image failed to start; restoring previous payload links."
-    systemctl stop snowluma.service snowluma-qq.service 2>/dev/null || true
+    systemctl stop nbot-snowluma.service nbot-qq.service 2>/dev/null || true
     if [[ -n "$old_app" ]]; then atomic_symlink "$old_app" "$SNOWLUMA_ROOT/app"; else rm -f "$SNOWLUMA_ROOT/app"; fi
     if [[ -n "$old_qq" ]]; then atomic_symlink "$old_qq" "$SNOWLUMA_ROOT/qq/current"; else rm -f "$SNOWLUMA_ROOT/qq/current"; fi
-    systemctl start snowluma-qq.service snowluma.service 2>/dev/null || true
-    journalctl -u snowluma-qq.service -u snowluma.service -n 120 --no-pager
+    systemctl start nbot-qq.service nbot-snowluma.service 2>/dev/null || true
+    journalctl -u nbot-qq.service -u nbot-snowluma.service -n 120 --no-pager
     die "SnowLuma image extraction installed but runtime verification failed."
   fi
 
@@ -269,7 +268,7 @@ configure_onebot() {
     ONEBOT_HTTP_PORT=$ONEBOT_HTTP_PORT ASTRBOT_WS_PORT=$ASTRBOT_WS_PORT \
     "$SNOWLUMA_PAYLOAD_ROOT/runtime/node" \
     /usr/local/lib/nbot/write-onebot-config
-  systemctl restart snowluma.service
+  systemctl restart nbot-snowluma.service
   info "OneBot configured: HTTP 127.0.0.1:${ONEBOT_HTTP_PORT}; WS -> 127.0.0.1:${ASTRBOT_WS_PORT}/ws"
   info "OneBot token：${token}"
   info "在 AstrBot WebUI 添加 OneBot v11 适配器时填写：端口 ${ASTRBOT_WS_PORT}，token 如上。"
@@ -278,7 +277,7 @@ configure_onebot() {
 install_snowluma_units() {
   local unit
   install_runtime_assets
-  for unit in snowluma.service snowluma-qq.service snowluma-watchdog.service snowluma-watchdog.timer; do
+  for unit in nbot-snowluma.service nbot-qq.service nbot-snowluma-watchdog.service nbot-snowluma-watchdog.timer; do
     install -m 0644 "$SCRIPT_DIR/assets/systemd/$unit" "/etc/systemd/system/$unit"
   done
   systemctl daemon-reload

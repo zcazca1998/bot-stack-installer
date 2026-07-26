@@ -10,11 +10,11 @@ if command -v node >/dev/null 2>&1; then
   node --check "$ROOT/assets/bin/write-onebot-config"
 fi
 
-grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/astrbot.service"
-grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/snowluma.service"
-grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/snowluma-qq.service"
-grep -q '^User=snowluma$' "$ROOT/assets/systemd/snowluma.service"
-grep -q '^User=snowluma$' "$ROOT/assets/systemd/snowluma-qq.service"
+grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/nbot-astrbot.service"
+grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/nbot-snowluma.service"
+grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/nbot-qq.service"
+grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-snowluma.service"
+grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-qq.service"
 ! grep -R -q '^Restart=always$' "$ROOT/assets/systemd"
 ! grep -R -q -- '--no-sync' "$ROOT/assets/bin" "$ROOT/lib" "$ROOT/modules" "$ROOT/install.sh" "$ROOT/install-core.sh"
 ! grep -R -qE '(^|[[:space:]])docker([[:space:]]|$)' "$ROOT/modules" "$ROOT/assets/bin"
@@ -24,7 +24,7 @@ grep -q 'cap_sys_ptrace' "$ROOT/modules/snowluma.sh"
 grep -q 'SNOWLUMA_PAYLOAD_ROOT/runtime/node' "$ROOT/assets/bin/snowluma-launch"
 grep -q 'cols < 74 || lines < 40' "$ROOT/assets/bin/qqlogin"
 ! grep -q 'xvfb-run' "$ROOT/assets/bin/qq-launch"
-! grep -q '^ExecStartPost=' "$ROOT/assets/systemd/snowluma-qq.service"
+! grep -q '^ExecStartPost=' "$ROOT/assets/systemd/nbot-qq.service"
 grep -q 'qq-auto-login &$' "$ROOT/assets/bin/qq-launch"
 # Login success must also be detected via the main window (login.enc lags).
 grep -q 'main_window_visible' "$ROOT/assets/bin/qqlogin"
@@ -94,7 +94,29 @@ grep -q 'NBOT_CONFIG:-/etc/nbot.conf' "$ROOT/lib/common-base.sh"
 
 # install-all must offer QR login; nbot qqlogin must pass through.
 grep -q '现在就扫码登录 QQ' "$ROOT/install-core.sh"
-grep -q 'qqlogin) exec /usr/local/bin/qqlogin' "$ROOT/install-core.sh"
+grep -q 'exec /usr/local/lib/nbot/qqlogin' "$ROOT/install-core.sh"
+# Control commands are nbot subcommands; standalone ctl scripts are gone.
+grep -q 'service_command()' "$ROOT/install-core.sh"
+[[ ! -e "$ROOT/assets/bin/snowlumactl" ]]
+[[ ! -e "$ROOT/assets/bin/astrbotctl" ]]
+[[ ! -e "$ROOT/assets/bin/novncctl" ]]
+# Every unit ships with the nbot- prefix.
+for unit in "$ROOT"/assets/systemd/*.service "$ROOT"/assets/systemd/*.timer; do
+  case "$(basename "$unit")" in
+    nbot-*|caddy.service) ;;
+    *) echo "Unit missing nbot- prefix: $unit" >&2; exit 1 ;;
+  esac
+done
+# China-facing fallbacks: GitHub mirrors and a pip index with PyPI fallback.
+grep -q 'GITHUB_MIRRORS' "$ROOT/lib/common-base.sh"
+grep -q 'mirrored_github_url' "$ROOT/lib/common-base.sh"
+grep -q 'PIP_INDEX_URL' "$ROOT/lib/common-base.sh"
+grep -q 'index-url' "$ROOT/modules/astrbot.sh"
+grep -q '回退官方 PyPI' "$ROOT/modules/astrbot.sh"
+# One-line bootstrap installer.
+[[ -f "$ROOT/bootstrap.sh" ]]
+grep -q 'NBOT_ARGS:-install-all' "$ROOT/bootstrap.sh"
+grep -q '/dev/tty' "$ROOT/bootstrap.sh"
 # Every helper script must carry the executable bit in git (JS files are
 # invoked via node and are exempt).
 if [[ "$(uname -s)" == Linux ]]; then
@@ -124,12 +146,12 @@ grep -q 'grace_time" =~ \^\[0-9\]' "$ROOT/assets/bin/snowluma-healthcheck"
 grep -q 'grace_time" =~ \^\[0-9\]' "$ROOT/assets/bin/astrbot-healthcheck"
 
 # noVNC stack: unprivileged, loopback-only, reverse-proxy friendly.
-grep -q '^User=snowluma$' "$ROOT/assets/systemd/snowluma-vnc.service"
-grep -q '^User=snowluma$' "$ROOT/assets/systemd/snowluma-novnc.service"
+grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-vnc.service"
+grep -q '^User=snowluma$' "$ROOT/assets/systemd/nbot-novnc.service"
 grep -q -- '-localhost' "$ROOT/assets/bin/vnc-server-launch"
 grep -q '127\.0\.0\.1:\${NOVNC_PORT}' "$ROOT/assets/bin/novnc-web-launch"
 grep -q -- '--heartbeat' "$ROOT/assets/bin/novnc-web-launch"
-grep -q 'PartOf=snowluma-qq.service' "$ROOT/assets/systemd/snowluma-vnc.service"
+grep -q 'PartOf=nbot-qq.service' "$ROOT/assets/systemd/nbot-vnc.service"
 grep -q 'proxy_set_header Upgrade' "$ROOT/modules/novnc.sh"
 grep -q 'handle_path /novnc/\*' "$ROOT/modules/novnc.sh"
 

@@ -48,4 +48,4 @@
 1. --no-sync 是 uv 参数，普通 venv 启动不能使用。
 2. 新版 AstrBot 需要 Python 3.12 或更高。
 3. 更新时创建新 venv，安装成功并通过启动检查后再切换。
-4. astrbotctl logs 默认应输出完整 journal，-n 和 -f 作为可选模式。
+4. nbot astrbot logs 默认应输出完整 journal，-n 和 -f 作为可选模式。

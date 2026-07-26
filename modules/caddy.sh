@@ -105,7 +105,7 @@ EOF
 
 install_caddy() {
   local site tls_line='' pw='' hash='' existing_hash='' site_file code shown_pw=''
-  [[ -f /etc/systemd/system/snowluma-novnc.service ]] ||
+  [[ -f /etc/systemd/system/nbot-novnc.service ]] ||
     die "请先执行 install-novnc，再配置 Caddy 反向代理。"
   install_packages ca-certificates curl jq openssl
   install_caddy_binary

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -u
 source /etc/nbot.conf
-cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+cgroup=/sys/fs/cgroup/system.slice/nbot-qq.service/cgroup.procs
 deadline=$(( $(date +%s) + 90 ))
 attempts=0
 visual_misses=0
@@ -82,12 +82,12 @@ while (( $(date +%s) < deadline )); do
   sleep 0.12
   DISPLAY="$display" XAUTHORITY="$auth" xdotool mouseup 1 2>/dev/null || true
   attempts=$((attempts + 1))
-  logger -t snowluma "QQ quick-login click attempt ${attempts} (${how}, visual-misses=${visual_misses}) at ${x},${y} in ${width}x${height} window"
+  logger -t nbot "QQ quick-login click attempt ${attempts} (${how}, visual-misses=${visual_misses}) at ${x},${y} in ${width}x${height} window"
   sleep 8
 done
 
 state=$(/usr/local/lib/nbot/qq-login-state --machine 2>/dev/null || echo unknown)
 [[ "$state" == logged-in ]] && exit 0
 resolve_xvfb && main_window_visible 2>/dev/null && exit 0
-logger -t snowluma 'No safe QQ quick-login action was available; manual qqlogin may be required'
+logger -t nbot 'No safe QQ quick-login action was available; manual qqlogin may be required'
 exit 0

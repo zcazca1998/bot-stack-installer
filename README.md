@@ -23,7 +23,19 @@
 
 拆镜像时载荷目录至少需要 6 GiB 可用空间。临时 OCI 层与 rootfs 会在成功或失败后清除。
 
-## 使用
+## 一键安装
+
+~~~bash
+curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
+~~~
+
+自动拉取源码（GitHub 加速站 → 直连逐级回退）并进入一键安装流程。想先看菜单：
+
+~~~bash
+curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo NBOT_ARGS=menu bash
+~~~
+
+也可以手动克隆后运行：
 
 ~~~bash
 cd nbot
@@ -70,10 +82,10 @@ sudo ./install.sh install-novnc
 ~~~
 
 - websockify 与 x11vnc 都只绑定 127.0.0.1，不直接暴露公网；请用 Nginx 或 Caddy 反向代理并叠加 HTTPS 与鉴权。
-- 现成的反代示例（含 WebSocket upgrade、超时、Caddy basic_auth）写在 /usr/local/lib/nbot/novnc-proxy.example，`novncctl proxy-example` 可随时查看。
+- 现成的反代示例（含 WebSocket upgrade、超时、Caddy basic_auth）写在 /usr/local/lib/nbot/novnc-proxy.example，`nbot novnc proxy-example` 可随时查看。
 - noVNC 使用相对路径，可直接挂在 /novnc/ 之类的子路径下；websockify 开启了 30 秒心跳，避免被反代空闲超时断开。
-- x11vnc 复用 QQ 的 DISPLAY :91 与 Xauthority，随 snowluma-qq.service 启停（PartOf）。
-- VNC 密码保存在 /nbot/snowluma/config/vnc-password，`novncctl password` 查看；它只是第二层防护，鉴权必须由反代承担。
+- x11vnc 复用 QQ 的 DISPLAY :91 与 Xauthority，随 nbot-qq.service 启停（PartOf）。
+- VNC 密码保存在 /nbot/snowluma/config/vnc-password，`nbot novnc password` 查看；它只是第二层防护，鉴权必须由反代承担。
 
 安装器可以直接接管 Caddy（noVNC 装完会询问，也可单独执行）：
 
@@ -88,33 +100,39 @@ sudo ./install.sh install-caddy
 - 启动前 `caddy validate` 校验；自签名模式还会自测「未认证 401 / 带凭据 200」。
 
 ~~~bash
-novncctl status
-novncctl url
-novncctl password
-novncctl proxy-example
-novncctl logs -f
+nbot novnc status
+nbot novnc url
+nbot novnc password
+nbot novnc proxy-example
+nbot novnc logs -f
 ~~~
 
 QQ 登录与管理：
 
 ~~~bash
-qqlogin
-qqlogin --fresh
-qqrefresh
-snowlumactl status
-snowlumactl logs -f
-snowlumactl qq-status
-snowlumactl qq-restart
-snowlumactl update
+nbot login              # 终端扫码登录
+nbot login --fresh      # 被踢下线/登录过期后强制重新扫码
+nbot refresh            # 手动刷新二维码
+nbot snowluma status
+nbot snowluma logs -f
+nbot qq status
+nbot qq restart
+nbot snowluma update
 ~~~
 
-## 下载策略
+## 国内网络优化
 
-GitHub 支持三种模式：
+三条下载链路都有逐级回退，默认值对国内机器友好：
 
-- auto：先使用配置代理，失败后自动直连。
+- **GitHub**：配置代理 → 加速站（ghfast.top、gh-proxy.com、ghproxy.net）→ 直连。加速站列表可在基础配置里改，留空则不用。
+- **容器镜像**：dockerproxy.net → docker.1ms.run → Docker Hub，已下载的 blob 会在切换源时复用。
+- **pip**（AstrBot 依赖数百 MB）：默认阿里云 PyPI 镜像，失败自动回退官方源。
+
+GitHub 访问支持三种模式：
+
+- auto：先使用配置代理，失败后依次尝试加速站与直连。
 - proxy：仅使用代理。
-- direct：仅直连。
+- direct：不用代理（仍会尝试加速站）。
 
 代理示例：
 

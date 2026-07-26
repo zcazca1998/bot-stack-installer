@@ -2,11 +2,11 @@
 set -Eeuo pipefail
 source /etc/nbot.conf
 : "${SNOWLUMA_ROOT:=/nbot/snowluma}" "${SNOWLUMA_WEBUI_PORT:=5099}"
-web_fail=/run/snowluma-watchdog.web-failures
-hook_fail=/run/snowluma-watchdog.hook-failures
-qq_fail=/run/snowluma-watchdog.qq-failures
-grace=/run/snowluma-watchdog.session-grace
-offline_attempted=/run/snowluma-watchdog.offline-recovery-attempted
+web_fail=/run/nbot-snowluma-watchdog.web-failures
+hook_fail=/run/nbot-snowluma-watchdog.hook-failures
+qq_fail=/run/nbot-snowluma-watchdog.qq-failures
+grace=/run/nbot-snowluma-watchdog.session-grace
+offline_attempted=/run/nbot-snowluma-watchdog.offline-recovery-attempted
 
 increment() {
   local file=$1 count
@@ -15,27 +15,27 @@ increment() {
   count=$((count + 1)); echo "$count" > "$file"; echo "$count"
 }
 restart_snowluma() {
-  logger -t snowluma-watchdog "$1; restarting SnowLuma only"
+  logger -t nbot-snowluma-watchdog "$1; restarting SnowLuma only"
   rm -f "$web_fail" "$hook_fail"
-  systemctl --no-block restart snowluma.service
+  systemctl --no-block restart nbot-snowluma.service
 }
 restart_stack() {
-  logger -t snowluma-watchdog "$1; restarting QQ and SnowLuma once to recover the account session"
+  logger -t nbot-snowluma-watchdog "$1; restarting QQ and SnowLuma once to recover the account session"
   rm -f "$web_fail" "$hook_fail" "$qq_fail" "$grace"
-  systemctl stop snowluma.service
-  systemctl restart snowluma-qq.service
-  systemctl --no-block start snowluma.service
+  systemctl stop nbot-snowluma.service
+  systemctl restart nbot-qq.service
+  systemctl --no-block start nbot-snowluma.service
 }
 
-qq_state=$(systemctl is-active snowluma-qq.service 2>/dev/null || true)
-snow_state=$(systemctl is-active snowluma.service 2>/dev/null || true)
+qq_state=$(systemctl is-active nbot-qq.service 2>/dev/null || true)
+snow_state=$(systemctl is-active nbot-snowluma.service 2>/dev/null || true)
 
 # QQ runtime protection runs first and does not depend on SnowLuma being
 # alive: a broken Xvfb/D-Bus must be recovered even while SnowLuma is down.
 qq_pid=
 xvfb_ok=0
 if [[ "$qq_state" == active ]]; then
-  cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+  cgroup=/sys/fs/cgroup/system.slice/nbot-qq.service/cgroup.procs
   if [[ -r "$cgroup" ]]; then
     while read -r pid; do
       [[ -r "/proc/$pid/comm" ]] || continue

@@ -1,7 +1,7 @@
 [Unit]
 Description=noVNC web client for the QQ display (127.0.0.1 only; front with a reverse proxy)
-After=network-online.target snowluma-vnc.service
-Wants=snowluma-vnc.service
+After=network-online.target nbot-vnc.service
+Wants=nbot-vnc.service
 
 [Service]
 Type=simple

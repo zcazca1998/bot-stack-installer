@@ -5,9 +5,9 @@ source /etc/nbot.conf
 machine=0
 [[ ${1:-} == --machine ]] && machine=1
 
-if ! systemctl is-active --quiet snowluma-qq.service; then
+if ! systemctl is-active --quiet nbot-qq.service; then
   status=service-down
-elif [[ $(systemctl is-active snowluma.service 2>/dev/null || true) != active ]]; then
+elif [[ $(systemctl is-active nbot-snowluma.service 2>/dev/null || true) != active ]]; then
   login_state=$(/usr/local/lib/nbot/qq-login-state --machine 2>/dev/null || echo unknown)
   [[ "$login_state" == logged-in ]] && status=snowluma-down || status=waiting-login
 else

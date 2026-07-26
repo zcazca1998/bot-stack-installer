@@ -1,7 +1,7 @@
 [Unit]
 Description=SnowLuma OneBot service (extracted official image)
-After=network-online.target snowluma-qq.service
-Wants=network-online.target snowluma-qq.service
+After=network-online.target nbot-qq.service
+Wants=network-online.target nbot-qq.service
 
 [Service]
 Type=simple

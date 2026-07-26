@@ -21,7 +21,7 @@ for command in ffmpeg xdotool zbarimg qrencode; do
   command -v "$command" >/dev/null || { echo "缺少命令：$command，请执行 nbot repair" >&2; exit 1; }
 done
 
-cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+cgroup=/sys/fs/cgroup/system.slice/nbot-qq.service/cgroup.procs
 login_file="$SNOWLUMA_ROOT/config/QQ/auth/login.enc"
 
 display= auth=
@@ -48,15 +48,15 @@ restart_qq() {
   # clear_state=1: also back up login.enc so QQ boots straight into the QR
   # page instead of an expired quick-login list or an "expired" dialog.
   local clear_state=$1
-  systemctl stop snowluma.service 2>/dev/null || true
-  systemctl stop snowluma-qq.service 2>/dev/null || true
+  systemctl stop nbot-snowluma.service 2>/dev/null || true
+  systemctl stop nbot-qq.service 2>/dev/null || true
   if ((clear_state)) && [[ -f "$login_file" ]]; then
     mv -f "$login_file" "${login_file}.expired.bak"
     echo "已备份并清除过期登录态：${login_file}.expired.bak"
   fi
-  systemctl start snowluma-qq.service ||
-    { echo 'snowluma-qq.service 启动失败，请查看 snowlumactl logs' >&2; exit 1; }
-  systemctl --no-block start snowluma.service 2>/dev/null || true
+  systemctl start nbot-qq.service ||
+    { echo 'nbot-qq.service 启动失败，请查看 nbot snowluma logs' >&2; exit 1; }
+  systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
   # 等新的 Xvfb 与 QQ 窗口就绪：旧显示连接此刻已失效，过早截屏会让
   # X 工具带 SIGABRT 退出并刷屏。
   local waited=0
@@ -71,13 +71,13 @@ restart_qq() {
   done
 }
 
-service_state=$(systemctl is-active snowluma-qq.service 2>/dev/null || true)
+service_state=$(systemctl is-active nbot-qq.service 2>/dev/null || true)
 if [[ "$service_state" != active && "$service_state" != activating ]]; then
-  read -r -p 'snowluma-qq.service 未运行，现在启动？[Y/n] ' answer
+  read -r -p 'nbot-qq.service 未运行，现在启动？[Y/n] ' answer
   [[ "${answer:-Y}" =~ ^[Yy] ]] || exit 1
-  systemctl start snowluma-qq.service ||
-    { echo 'snowluma-qq.service 启动失败，请查看 snowlumactl logs' >&2; exit 1; }
-  systemctl --no-block start snowluma.service 2>/dev/null || true
+  systemctl start nbot-qq.service ||
+    { echo 'nbot-qq.service 启动失败，请查看 nbot snowluma logs' >&2; exit 1; }
+  systemctl --no-block start nbot-snowluma.service 2>/dev/null || true
 fi
 
 if ((fresh == 0)); then
@@ -150,10 +150,10 @@ while :; do
     printf '终端窗口太小，无法显示可扫描的二维码。\n需要：74 列 x 40 行\n当前：%s 列 x %s 行\n' "$cols" "$lines"
     sleep 3; continue
   fi
-  if ((ticks >= 5)); then /usr/local/bin/qqrefresh -q >/dev/null 2>&1 || true; ticks=0; sleep 1; fi
+  if ((ticks >= 5)); then /usr/local/lib/nbot/qqrefresh -q >/dev/null 2>&1 || true; ticks=0; sleep 1; fi
   payload=$(capture_and_decode 2>/dev/null || true)
   if [[ -z "$payload" ]]; then
-    /usr/local/bin/qqrefresh -q >/dev/null 2>&1 || true; sleep 1
+    /usr/local/lib/nbot/qqrefresh -q >/dev/null 2>&1 || true; sleep 1
     payload=$(capture_and_decode 2>/dev/null || true)
   fi
   printf '\033[0m\033[H\033[2JQQ 扫码登录 | 每 3 秒刷新 | %s | Ctrl+C 退出\n\n' "$(date '+%F %T')"
@@ -171,7 +171,7 @@ while :; do
       printf '重启后仍无二维码，清除过期登录态后再次重启，强制回到扫码页...\n'
       restart_qq 1
     elif ((stage >= 2 && qrless >= 8)); then
-      printf '仍未出现二维码。请检查日志：snowlumactl logs -n 100\n也可 Ctrl+C 退出后重试 qqlogin --fresh\n'
+      printf '仍未出现二维码。请检查日志：nbot snowluma logs -n 100\n也可 Ctrl+C 退出后重试 nbot login --fresh\n'
     else
       printf '等待可解码的 QQ 二维码...\n'
     fi
