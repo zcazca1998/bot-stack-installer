@@ -137,6 +137,12 @@ install_all() {
   if confirm "同时安装 noVNC 远程画面（浏览器查看 QQ 画面，可接 Caddy 反代）？" N; then
     install_novnc
   fi
+  if [[ -t 1 ]] && confirm "现在就扫码登录 QQ？" Y; then
+    /usr/local/bin/qqlogin || true
+    if confirm "继续配置 OneBot 对接 AstrBot？" Y; then
+      configure_onebot || true
+    fi
+  fi
   print_summary
 }
 
@@ -297,6 +303,7 @@ main() {
     status) status_all ;;
     doctor) doctor ;;
     logs) show_logs "${2:-}" ;;
+    qqlogin) exec /usr/local/bin/qqlogin "${@:2}" ;;
     help|-h|--help) show_help ;;
     *) warn "未知命令：$1"; show_help; exit 1 ;;
   esac

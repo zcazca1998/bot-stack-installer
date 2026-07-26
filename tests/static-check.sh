@@ -57,6 +57,15 @@ grep -q 'show_help()' "$ROOT/install-core.sh"
 # Uninstall must remove the logrotate and journald drop-ins.
 grep -q 'rm -f /etc/logrotate.d/bot-stack' "$ROOT/install-core.sh"
 grep -q 'journald.conf.d/bot-stack.conf' "$ROOT/install-core.sh"
+
+# install-all must offer QR login; bot-stack qqlogin must pass through.
+grep -q '现在就扫码登录 QQ' "$ROOT/install-core.sh"
+grep -q 'qqlogin) exec /usr/local/bin/qqlogin' "$ROOT/install-core.sh"
+# Every helper script must carry the executable bit in git.
+if [[ "$(uname -s)" == Linux ]]; then
+  unexec=$(find "$ROOT/assets/bin" "$ROOT/tests" -type f ! -perm -u+x || true)
+  [[ -z "$unexec" ]] || { echo "Missing exec bit: $unexec" >&2; exit 1; }
+fi
 grep -q 'python-build-standalone' "$ROOT/modules/astrbot.sh"
 grep -q 'release_id=.*RANDOM' "$ROOT/modules/snowluma.sh"
 
