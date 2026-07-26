@@ -1,7 +1,11 @@
 # nbot
 
+[![CI](https://github.com/zcazca1998/nbot/actions/workflows/ci.yml/badge.svg)](https://github.com/zcazca1998/nbot/actions/workflows/ci.yml)
+
 Debian / Ubuntu / Armbian 上的 **AstrBot + SnowLuma + Linux QQ** 一键部署器。
 自动识别 amd64 与 arm64，不安装 Docker，全部服务由原生 systemd 管理。
+
+安装后用 `sudo nbot` 进入交互菜单，或 `nbot help` 查看全部命令。
 
 ---
 
