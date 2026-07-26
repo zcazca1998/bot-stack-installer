@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Point data roots at /mnt and disable China-facing mirrors
         run: |
           sudo tee /etc/nbot.conf >/dev/null <<'EOF'

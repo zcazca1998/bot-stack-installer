@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Syntax check
         run: |
           for f in install.sh install-core.sh lib/*.sh modules/*.sh tests/*.sh assets/bin/*; do
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install AstrBot end to end
         run: sudo ./install.sh install-astrbot
       - name: Verify service and WebUI
@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Point data roots at /mnt and disable China-facing mirrors
         run: |
           sudo tee /etc/nbot.conf >/dev/null <<'EOF'
