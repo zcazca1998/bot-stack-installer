@@ -128,6 +128,13 @@ grep -q 'pypi.tuna.tsinghua.edu.cn' "$ROOT/lib/common-base.sh"
 grep -q 'mirrors.ustc.edu.cn' "$ROOT/lib/common-base.sh"
 grep -q '自定义填写' "$ROOT/lib/common-base.sh"
 grep -q 'NETWORK_REGION=%q' "$ROOT/lib/common-base.sh"
+# Every prompt must degrade to its default when running unattended, so custom
+# mirrors stay fully automatable via env vars or a hand-written config.
+grep -q 'nbot_interactive()' "$ROOT/lib/common-base.sh"
+for fn in prompt_default prompt_port confirm pick_option detect_network_region; do
+  sed -n "/^${fn}() {/,/^}/p" "$ROOT/lib/common-base.sh" | grep -q 'nbot_interactive' ||
+    { echo "$fn missing non-interactive guard" >&2; exit 1; }
+done
 # Every helper script must carry the executable bit in git (JS files are
 # invoked via node and are exempt).
 if [[ "$(uname -s)" == Linux ]]; then

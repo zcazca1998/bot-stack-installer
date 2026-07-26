@@ -239,10 +239,24 @@ git_args() {
   [[ "$GITHUB_ACCESS" != direct && -n "$GITHUB_PROXY" ]] && GIT_ARGS=(-c "http.proxy=$GITHUB_PROXY" -c "https.proxy=$GITHUB_PROXY")
 }
 
+nbot_interactive() {
+  # NBOT_FORCE_PROMPT=1 供测试用管道喂输入；NBOT_NONINTERACTIVE=1 强制静默。
+  [[ "${NBOT_NONINTERACTIVE:-0}" != 1 ]] || return 1
+  [[ "${NBOT_FORCE_PROMPT:-0}" != 1 ]] || return 0
+  [[ -t 0 ]]
+}
+
 detect_network_region() {
   # 用实测连通性判断，而不是猜时区：能快速直连 GitHub 就按海外处理。
   # 结果写回配置，后续运行不再重复探测。
   [[ "$NETWORK_REGION" == auto ]] || return 0
+  # 非交互运行（CI、cloud-init、管道）不探测也不提问：保留镜像默认值，
+  # 需要覆盖的用环境变量或直接写 /etc/nbot.conf。
+  if ! nbot_interactive; then
+    NETWORK_REGION=cn
+    export NETWORK_REGION
+    return 0
+  fi
   info "正在探测网络环境（约需 10 秒）..."
   if curl -fsS --max-time 6 -o /dev/null https://api.github.com/ 2>/dev/null &&
      curl -fsS --max-time 6 -o /dev/null https://pypi.org/simple/ 2>/dev/null; then
@@ -266,6 +280,11 @@ pick_option() {
   local __name=$1 message=$2 current=$3 arr_name=$4
   local -n choices=$arr_name
   local i label value custom_index keep_index answer
+  # 非交互运行保持当前值，不提问。
+  if ! nbot_interactive; then
+    printf -v "$__name" '%s' "$current"
+    return 0
+  fi
   bold "$message"
   for i in "${!choices[@]}"; do
     label=${choices[$i]%%|*}
@@ -306,6 +325,10 @@ host_of_url() {
 prompt_default() {
   # Enter keeps the default; a single "-" clears the value entirely.
   local __name=$1 message=$2 default=$3 value
+  if ! nbot_interactive; then
+    printf -v "$__name" '%s' "$default"
+    return 0
+  fi
   read -r -p "$message [$default]: " value
   if [[ "$value" == - ]]; then
     printf -v "$__name" ''
@@ -316,6 +339,10 @@ prompt_default() {
 
 prompt_port() {
   local __name=$1 message=$2 default=$3 value
+  if ! nbot_interactive; then
+    printf -v "$__name" '%s' "$default"
+    return 0
+  fi
   while :; do
     read -r -p "$message [$default]: " value
     value=${value:-$default}
@@ -329,6 +356,10 @@ prompt_port() {
 
 confirm() {
   local message=$1 default=${2:-N} answer suffix='[y/N]'
+  if ! nbot_interactive; then
+    [[ "$default" == Y ]]
+    return
+  fi
   [[ "$default" == Y ]] && suffix='[Y/n]'
   read -r -p "$message $suffix " answer
   answer=${answer:-$default}

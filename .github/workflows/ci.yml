@@ -33,6 +33,7 @@ jobs:
           bash tests/github-fetch-check.sh
           bash tests/caddy-config-check.sh
           bash tests/mirror-menu-check.sh
+          bash tests/noninteractive-check.sh
       - name: Release metadata check (GitHub API, may rate-limit)
         continue-on-error: true
         run: bash tests/release-check.sh

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+NBOT_FORCE_PROMPT=1
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 NBOT_CONFIG=/nonexistent
 source "$ROOT/lib/common.sh"
