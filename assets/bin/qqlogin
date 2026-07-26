@@ -92,19 +92,34 @@ resolve_display() {
   [[ -n "$display" && -r "$auth" ]]
 }
 
+main_window_visible() {
+  # 登录成功后 320x460 登录小窗会关闭、出现宽度更大的主窗口。login.enc 的
+  # isUserLogin 写入可能滞后十几秒，窗口尺寸是更快的成功信号。
+  local w width
+  resolve_display || return 1
+  for w in $(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null); do
+    width=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$w" 2>/dev/null | sed -n 's/^WIDTH=//p' || true)
+    [[ "$width" =~ ^[0-9]+$ ]] && ((width >= 600)) && return 0
+  done
+  return 1
+}
+
 capture_and_decode() {
   local window geometry x y width height
   resolve_display || return 1
   window=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null | tail -1 || true)
   [[ -n "$window" ]] || return 1
-  geometry=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$window")
+  # X 服务在自愈重启的瞬间会消失，任何 X 工具都可能带崩溃信息退出；
+  # 全部静音并容错，下一轮循环自然重试。
+  geometry=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$window" 2>/dev/null || true)
+  [[ -n "$geometry" ]] || return 1
   x=$(sed -n 's/^X=//p' <<<"$geometry"); y=$(sed -n 's/^Y=//p' <<<"$geometry")
   width=$(sed -n 's/^WIDTH=//p' <<<"$geometry"); height=$(sed -n 's/^HEIGHT=//p' <<<"$geometry")
   [[ "$x:$y:$width:$height" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+$ ]] || return 1
   ((width >= 260 && width <= 500 && height >= 360 && height <= 650)) || return 1
   DISPLAY="$display" XAUTHORITY="$auth" ffmpeg -hide_banner -loglevel error -y \
     -f x11grab -video_size "${width}x${height}" -i "${display}+${x},${y}" \
-    -vf "scale=$((width * 4)):$((height * 4)):flags=neighbor" -frames:v 1 "$tmp"
+    -vf "scale=$((width * 4)):$((height * 4)):flags=neighbor" -frames:v 1 "$tmp" 2>/dev/null || return 1
   zbarimg --quiet --raw --set '*.enable=0' --set 'qrcode.enable=1' "$tmp" 2>/dev/null
 }
 
@@ -113,7 +128,8 @@ ticks=0
 qrless=0
 stage=0
 while :; do
-  if [[ $(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || true) == logged-in ]]; then
+  if [[ $(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || true) == logged-in ]] ||
+     main_window_visible 2>/dev/null; then
     printf '\033[0m\033[H\033[2JQQ 登录成功。\n'
     exit 0
   fi
@@ -124,10 +140,10 @@ while :; do
     sleep 3; continue
   fi
   if ((ticks >= 5)); then /usr/local/bin/qqrefresh -q >/dev/null 2>&1 || true; ticks=0; sleep 1; fi
-  payload=$(capture_and_decode || true)
+  payload=$(capture_and_decode 2>/dev/null || true)
   if [[ -z "$payload" ]]; then
     /usr/local/bin/qqrefresh -q >/dev/null 2>&1 || true; sleep 1
-    payload=$(capture_and_decode || true)
+    payload=$(capture_and_decode 2>/dev/null || true)
   fi
   printf '\033[0m\033[H\033[2JQQ 扫码登录 | 每 3 秒刷新 | %s | Ctrl+C 退出\n\n' "$(date '+%F %T')"
   if [[ -n "$payload" ]]; then

@@ -26,6 +26,9 @@ grep -q 'cols < 74 || lines < 40' "$ROOT/assets/bin/qqlogin"
 ! grep -q 'xvfb-run' "$ROOT/assets/bin/qq-launch"
 ! grep -q '^ExecStartPost=' "$ROOT/assets/systemd/snowluma-qq.service"
 grep -q 'qq-auto-login &$' "$ROOT/assets/bin/qq-launch"
+# Login success must also be detected via the main window (login.enc lags).
+grep -q 'main_window_visible' "$ROOT/assets/bin/qqlogin"
+grep -q 'main_window_visible' "$ROOT/assets/bin/qq-auto-login"
 # Quick-login clicks must be proportional with a generous startup budget.
 grep -q 'height \* 71 / 100' "$ROOT/assets/bin/qq-auto-login"
 grep -q '+ 90' "$ROOT/assets/bin/qq-auto-login"

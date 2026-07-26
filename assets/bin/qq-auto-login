@@ -22,11 +22,22 @@ resolve_xvfb() {
   [[ -n "$display" && -r "$auth" ]]
 }
 
+main_window_visible() {
+  # 主窗口（宽 >= 600）出现即视为已登录，比 login.enc 的写入快得多。
+  local w width
+  for w in $(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null); do
+    width=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$w" 2>/dev/null | sed -n 's/^WIDTH=//p')
+    [[ "$width" =~ ^[0-9]+$ ]] && ((width >= 600)) && return 0
+  done
+  return 1
+}
+
 while (( $(date +%s) < deadline )); do
   state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
   [[ "$state" == logged-in ]] && exit 0
-  [[ "$state" == quick-login ]] || { sleep 2; continue; }
   resolve_xvfb || { sleep 2; continue; }
+  main_window_visible 2>/dev/null && exit 0
+  [[ "$state" == quick-login ]] || { sleep 2; continue; }
   window=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null | tail -1 || true)
   [[ -n "$window" ]] || { sleep 2; continue; }
   geometry=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$window" 2>/dev/null || true)
@@ -49,5 +60,6 @@ done
 
 state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
 [[ "$state" == logged-in ]] && exit 0
+resolve_xvfb && main_window_visible 2>/dev/null && exit 0
 logger -t snowluma 'No safe QQ quick-login action was available; manual qqlogin may be required'
 exit 0
