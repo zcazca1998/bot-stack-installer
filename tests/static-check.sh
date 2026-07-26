@@ -35,6 +35,8 @@ grep -q 'Prefetching verified large image layer' "$ROOT/modules/snowluma.sh"
 grep -q 'cp -aln.*cache/sha256' "$ROOT/modules/snowluma.sh"
 grep -q 'prune_image_releases' "$ROOT/modules/snowluma.sh"
 grep -q 'astrbot-prepare.*usr/local/lib/bot-stack/astrbot-prepare' "$ROOT/modules/astrbot.sh"
+# astrbot.cli init prompts interactively; systemd has no stdin to answer with.
+grep -q "printf 'y" "$ROOT/assets/bin/astrbot-prepare"
 grep -q 'python-build-standalone' "$ROOT/modules/astrbot.sh"
 grep -q 'release_id=.*RANDOM' "$ROOT/modules/snowluma.sh"
 

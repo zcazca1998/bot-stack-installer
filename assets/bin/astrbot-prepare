@@ -5,7 +5,16 @@ cd "$ASTRBOT_ROOT"
 export PYTHONPATH="$ASTRBOT_ROOT/app"
 config="$ASTRBOT_ROOT/data/cmd_config.json"
 if [[ ! -f "$config" ]]; then
-  "$ASTRBOT_ROOT/.venv/bin/python" -m astrbot.cli init
+  # astrbot.cli init asks interactive [Y/n] questions and systemd provides no
+  # stdin; feed affirmative answers. A short printf finishes before the reader
+  # can exit, so pipefail never sees a SIGPIPE.
+  printf 'y\ny\ny\ny\ny\n' | "$ASTRBOT_ROOT/.venv/bin/python" -m astrbot.cli init ||
+    echo 'astrbot.cli init failed; continuing with a minimal config' >&2
+fi
+if [[ ! -f "$config" ]]; then
+  mkdir -p "$ASTRBOT_ROOT/data"
+  printf '{}\n' > "$config"
+  chmod 0600 "$config"
 fi
 CONFIG_PATH=$config DASHBOARD_PORT=$ASTRBOT_PORT "$ASTRBOT_ROOT/.venv/bin/python" <<'PY'
 import json

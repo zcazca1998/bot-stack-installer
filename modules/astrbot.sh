@@ -74,7 +74,9 @@ install_astrbot() {
 
   systemctl daemon-reload
   systemctl enable astrbot.service astrbot-watchdog.timer >/dev/null
-  systemctl start astrbot.service astrbot-watchdog.timer
+  # A start failure must fall through to the rollback below, not kill the
+  # script via set -e before it can restore the previous version.
+  systemctl start astrbot.service astrbot-watchdog.timer || true
   sleep 5
   if ! systemctl is-active --quiet astrbot.service; then
     warn "新版本未能启动，正在回滚。"
