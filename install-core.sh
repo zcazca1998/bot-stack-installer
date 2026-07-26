@@ -278,46 +278,52 @@ service_command() {
 
 show_help() {
   cat <<'EOF'
-nbot — AstrBot + SnowLuma + QQ 一键部署管理器
-用法：nbot <命令>        （无参数进入交互菜单）
+nbot — AstrBot + SnowLuma + QQ 一键部署器
+用法：nbot <命令>        无参数进入交互菜单
 
 安装与配置
-  install-all        一键安装全部（推荐）：配置 -> AstrBot -> SnowLuma+QQ -> 扫码 -> 对接
-  install-astrbot    安装/更新 AstrBot
-  install-snowluma   安装/更新 SnowLuma + QQ（拆官方镜像，不装 Docker）
-  install-novnc      安装 noVNC 远程画面（浏览器看 QQ 桌面）
-  install-caddy      安装/配置 Caddy 反向代理（HTTPS + 登录）
-  configure          基础配置（工作区/端口/代理/镜像加速/日志上限）
-  configure-onebot   配置 OneBot 对接 AstrBot（会显示 token）
-  repair             重装服务、看门狗、控制脚本与日志轮转
-  uninstall          卸载（默认保留数据；删数据需输入 DELETE）
+  install-all           一键安装全部（推荐）
+  install-astrbot       安装 / 更新 AstrBot
+  install-snowluma      安装 / 更新 SnowLuma + QQ（拆官方镜像，不装 Docker）
+  install-novnc         安装 noVNC 远程画面
+  install-caddy         安装 / 配置 Caddy 反向代理（HTTPS + 登录）
+  configure             基础配置（目录 / 端口 / 代理 / 镜像 / 日志上限）
+  configure-onebot      配置 OneBot 对接 AstrBot，并显示 token
+  repair                重装服务、看门狗、控制脚本与日志轮转
+  uninstall             卸载（默认保留数据，删数据需输入 DELETE）
 
 QQ 登录
-  login              终端扫码登录（原 qqlogin）
-  login --fresh      被踢下线/登录过期后强制重新扫码
-  refresh            手动点击刷新二维码
-  qq status          查询 QQ 在线状态
+  login                 终端扫码登录
+  login --fresh         被踢下线 / 登录过期后强制重新扫码
+  refresh               手动点击刷新二维码
+  qq status             查询 QQ 在线状态
 
-组件控制（astrbot / snowluma / qq / novnc）
-  nbot astrbot  {start|stop|restart|status|logs|update}
-  nbot snowluma {start|stop|restart|status|logs|update}
-  nbot qq       {start|stop|restart|status|logs|update}
-  nbot novnc    {start|stop|restart|status|logs|update|password|url|proxy-example}
-  日志跟踪：nbot snowluma logs -f      最近 N 行：nbot astrbot logs -n 200
+组件控制    nbot <组件> start|stop|restart|status|logs|update
+  组件：astrbot | snowluma | qq | novnc
+  例：nbot astrbot restart          重启 AstrBot
+      nbot snowluma logs -f         实时跟踪 SnowLuma + QQ 日志
+      nbot astrbot logs -n 200      查看最近 200 行
+      nbot qq restart               重启 QQ（先停 SnowLuma 避免 Hook 悬空）
+      nbot snowluma update          重新拆镜像更新 SnowLuma + QQ
+  noVNC 专属：nbot novnc url | password | proxy-example
 
-状态与日志
-  status             全部服务状态总览
-  doctor             环境诊断（挂载、端口、WebUI 探活）
-  logs {astrbot|snowluma|watchdog}
+状态与诊断
+  status                全部服务状态总览
+  doctor                环境诊断（挂载、端口、WebUI 探活）
+  logs astrbot          AstrBot 完整日志
+  logs snowluma         SnowLuma + QQ 完整日志
+  logs watchdog         看门狗动作记录（何时重启了什么、为什么）
 
-国内网络优化（基础配置里可改）
-  GitHub：代理 -> 加速站（ghfast.top 等）-> 直连，逐级回退
-  镜像：dockerproxy.net -> docker.1ms.run -> Docker Hub
-  pip：默认阿里云镜像，失败自动回退官方 PyPI
+网络与自动化
+  首次配置会实测能否直连 GitHub / PyPI：海外默认直连，国内默认走镜像。
+  GitHub：代理 -> 加速站 -> 直连     镜像：首选 -> 备用 -> Docker Hub
+  pip：镜像 -> 官方 PyPI（默认清华 TUNA，可选阿里云 / 腾讯云 / USTC / 华为云）
+  每项都可在菜单里选或自定义填写；无终端时全部取默认值，可用环境变量或
+  直接写 /etc/nbot.conf 实现无人值守安装。
 
-日志占用限制（自动启用）
-  应用日志 logrotate 按 20M/7 天轮转；QQ 日志与崩溃转储每日清理（保留 7 天）；
-  journald 总量上限在基础配置中设置（默认建议 500M）。
+日志占用（自动启用）
+  应用日志 logrotate 按 20M / 7 天轮转；QQ 日志与崩溃转储每日清理（留 7 天）；
+  journald 总量上限在基础配置中设置。
 EOF
 }
 
