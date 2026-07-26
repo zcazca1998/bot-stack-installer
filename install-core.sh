@@ -19,11 +19,13 @@ install_self() {
     # 又会在源目录同时被 git 操作时导致复制报错。
     tar -C "$SCRIPT_DIR" --exclude=./.git -cf - . | tar -C "$target" -xf -
   fi
-  cat > /usr/local/sbin/bot-stack <<'EOF'
+  # nbot 是主命令；bot-stack 保留为别名，避免既有安装与文档失效。
+  cat > /usr/local/sbin/nbot <<'EOF'
 #!/bin/sh
 exec /usr/local/lib/bot-stack/installer/install.sh "$@"
 EOF
-  chmod 0755 /usr/local/sbin/bot-stack "$target/install.sh"
+  chmod 0755 /usr/local/sbin/nbot "$target/install.sh"
+  ln -sfn /usr/local/sbin/nbot /usr/local/sbin/bot-stack
 }
 
 configure_base() {
@@ -124,9 +126,9 @@ print_summary() {
   info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}"
   info "下一步："
   info "  1) qqlogin                     # 扫码登录 QQ"
-  info "  2) bot-stack configure-onebot  # 生成 OneBot 配置并显示 token"
+  info "  2) nbot configure-onebot  # 生成 OneBot 配置并显示 token"
   info "  3) 在 AstrBot WebUI 添加 OneBot v11 适配器（端口 ${ASTRBOT_WS_PORT} + 上一步的 token）"
-  info "常用命令：bot-stack status / doctor / logs；snowlumactl；astrbotctl；qqlogin --fresh"
+  info "常用命令：nbot status / doctor / logs；snowlumactl；astrbotctl；qqlogin --fresh"
 }
 
 install_all() {
@@ -170,7 +172,8 @@ uninstall_stack() {
   systemctl daemon-reload
   rm -rf /usr/local/lib/bot-stack
   rm -f /usr/local/bin/snowlumactl /usr/local/bin/qqlogin /usr/local/bin/qqrefresh \
-    /usr/local/bin/astrbotctl /usr/local/bin/novncctl /usr/local/sbin/bot-stack
+    /usr/local/bin/astrbotctl /usr/local/bin/novncctl \
+    /usr/local/sbin/nbot /usr/local/sbin/bot-stack
   rm -f /etc/logrotate.d/bot-stack
   if [[ -f /etc/systemd/journald.conf.d/bot-stack.conf ]]; then
     rm -f /etc/systemd/journald.conf.d/bot-stack.conf
@@ -196,8 +199,8 @@ uninstall_stack() {
 
 show_help() {
   cat <<'EOF'
-Bot Stack 安装管理器
-用法：bot-stack <命令>        （无参数进入交互菜单）
+Bot Stack 安装管理器（命令 nbot，兼容旧名 bot-stack）
+用法：nbot <命令>        （无参数进入交互菜单）
 
 安装与配置
   install-all        一键安装全部（推荐：配置 -> AstrBot -> SnowLuma+QQ -> 可选 noVNC/Caddy）
@@ -236,7 +239,7 @@ show_logs() {
     astrbot) journalctl -u astrbot.service --no-pager ;;
     snowluma) journalctl -u snowluma.service -u snowluma-qq.service --no-pager ;;
     watchdog) journalctl -t astrbot-watchdog -t snowluma-watchdog --no-pager ;;
-    *) die "Usage: bot-stack logs {astrbot|snowluma|watchdog}" ;;
+    *) die "Usage: nbot logs {astrbot|snowluma|watchdog}" ;;
   esac
 }
 

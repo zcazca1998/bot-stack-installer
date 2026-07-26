@@ -18,7 +18,7 @@ esac
 [[ -t 1 ]] || { echo 'qqlogin 需要交互式终端' >&2; exit 1; }
 [[ ${EUID:-$(id -u)} -eq 0 ]] || { echo '请使用 root 运行 qqlogin' >&2; exit 1; }
 for command in ffmpeg xdotool zbarimg qrencode; do
-  command -v "$command" >/dev/null || { echo "缺少命令：$command，请执行 bot-stack repair" >&2; exit 1; }
+  command -v "$command" >/dev/null || { echo "缺少命令：$command，请执行 nbot repair" >&2; exit 1; }
 done
 
 cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs

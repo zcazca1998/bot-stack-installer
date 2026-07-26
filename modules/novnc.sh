@@ -90,6 +90,6 @@ install_novnc() {
   if confirm "现在让安装器接管 Caddy（自动安装并生成 HTTPS + 登录配置）吗？" Y; then
     install_caddy
   else
-    info "之后可随时执行：bot-stack install-caddy"
+    info "之后可随时执行：nbot install-caddy"
   fi
 }

@@ -5,7 +5,7 @@
 ## 部署方式
 
 - AstrBot 使用普通 Python venv，不使用 uv。
-- 若系统缺少 Python 3.12+，安装器会把官方 python-build-standalone 3.13 运行时放到 /AstrBot/.python，再创建普通 venv。
+- 若系统缺少 Python 3.12+，安装器会把官方 python-build-standalone 3.13 运行时放到 /bot-stack/astrbot/.python，再创建普通 venv。
 - SnowLuma 与 QQ 从 SnowLuma 官方多架构 OCI 镜像拆出，但不会安装或运行 Docker daemon。
 - 镜像内的 SnowLuma、QQ 和 Node 被复制到数据盘，然后由原生 systemd 管理。
 - QQ 与 SnowLuma 使用同一个 snowluma 用户、DISPLAY、D-Bus 和 Hook 运行目录。
@@ -28,7 +28,7 @@
 ~~~bash
 cd bot-stack-installer
 chmod +x install.sh
-sudo ./install.sh
+sudo ./install.sh        # 首次；安装后任何目录直接 sudo nbot
 ~~~
 
 无参数进入交互菜单；推荐直接一键安装（配置 → AstrBot → SnowLuma+QQ → 服务与看门狗 → 可选 noVNC/Caddy → 输出总结与下一步指引）：
@@ -48,19 +48,19 @@ sudo ./install.sh repair
 卸载（默认保留数据；删数据需要二次确认并输入 DELETE）：
 
 ~~~bash
-sudo bot-stack uninstall
+sudo nbot uninstall
 ~~~
 
-安装器注册 bot-stack，后续可执行：
+安装器注册 `nbot` 命令（旧名 `bot-stack` 仍可用），后续可执行：
 
 ~~~bash
-bot-stack status
-bot-stack doctor
-bot-stack update-astrbot
-bot-stack update-snowluma
-bot-stack configure-onebot
-bot-stack logs astrbot
-bot-stack logs snowluma
+nbot status
+nbot doctor
+nbot update-astrbot
+nbot update-snowluma
+nbot configure-onebot
+nbot logs astrbot
+nbot logs snowluma
 ~~~
 
 可选安装 noVNC 远程画面（浏览器里查看/操作 QQ 的 Xvfb 桌面）：
@@ -73,7 +73,7 @@ sudo ./install.sh install-novnc
 - 现成的反代示例（含 WebSocket upgrade、超时、Caddy basic_auth）写在 /usr/local/lib/bot-stack/novnc-proxy.example，`novncctl proxy-example` 可随时查看。
 - noVNC 使用相对路径，可直接挂在 /novnc/ 之类的子路径下；websockify 开启了 30 秒心跳，避免被反代空闲超时断开。
 - x11vnc 复用 QQ 的 DISPLAY :91 与 Xauthority，随 snowluma-qq.service 启停（PartOf）。
-- VNC 密码保存在 /snowluma/config/vnc-password，`novncctl password` 查看；它只是第二层防护，鉴权必须由反代承担。
+- VNC 密码保存在 /bot-stack/snowluma/config/vnc-password，`novncctl password` 查看；它只是第二层防护，鉴权必须由反代承担。
 
 安装器可以直接接管 Caddy（noVNC 装完会询问，也可单独执行）：
 
@@ -151,7 +151,7 @@ dockerproxy.net/motricseven7/snowluma:latest
 - 应用自有日志（SnowLuma、AstrBot 文件日志）由 logrotate 按单文件 20M、保留 7 天轮转。
 - QQ 客户端日志与崩溃转储每日定时清理，保留 7 天；临时目录残留保留 3 天。
 - journald 总量上限在基础配置中设置（默认建议 500M，输入 - 保持系统默认）。
-- `bot-stack help` 查看全部命令与日志查看方式。
+- `nbot help` 查看全部命令与日志查看方式。
 
 ## 存储与升级
 
@@ -160,8 +160,8 @@ dockerproxy.net/motricseven7/snowluma:latest
 安装前应确认数据盘已经挂载：
 
 ~~~bash
-findmnt --target /AstrBot
-df -h /AstrBot /snowluma
+findmnt --target /bot-stack
+df -h /bot-stack
 ~~~
 
 脚本不会格式化磁盘，也不会自行修改 /etc/fstab。

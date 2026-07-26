@@ -5,7 +5,7 @@ NOVNC_VNC_PORT=${NOVNC_VNC_PORT:-5901}
 auth="$SNOWLUMA_ROOT/run/session/Xauthority"
 passwd_file="$SNOWLUMA_ROOT/config/vnc-password"
 
-[[ -s "$passwd_file" ]] || { echo 'VNC password file is missing; run bot-stack install-novnc' >&2; exit 3; }
+[[ -s "$passwd_file" ]] || { echo 'VNC password file is missing; run nbot install-novnc' >&2; exit 3; }
 
 # qq-launch owns the display; wait for Xvfb :91 and its Xauthority. Exit 0 on
 # timeout so systemd stays quiet while QQ is stopped: WantedBy=snowluma-qq

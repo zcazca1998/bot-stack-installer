@@ -13,7 +13,7 @@ case "$command" in
       *) echo 'Usage: astrbotctl logs [all|-f|-n NUMBER]' >&2; exit 2 ;;
     esac
     ;;
-  update) exec bot-stack update-astrbot ;;
-  doctor) exec bot-stack doctor ;;
+  update) exec nbot update-astrbot ;;
+  doctor) exec nbot doctor ;;
   *) echo 'Usage: astrbotctl {start|stop|restart|status|logs|update|doctor}' >&2; exit 2 ;;
 esac

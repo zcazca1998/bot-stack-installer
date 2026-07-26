@@ -80,6 +80,14 @@ grep -q '^write_config$' "$ROOT/install.sh"
 grep -q 'exclude=./.git' "$ROOT/install.sh"
 grep -q 'exclude=./.git' "$ROOT/install-core.sh"
 
+# nbot is the primary command; bot-stack stays as a symlink for existing
+# installs, and both must be removed on uninstall.
+grep -q 'sbin/nbot <<' "$ROOT/install-core.sh"
+grep -q 'ln -sfn /usr/local/sbin/nbot /usr/local/sbin/bot-stack' "$ROOT/install-core.sh"
+grep -q 'sbin/nbot /usr/local/sbin/bot-stack' "$ROOT/install-core.sh"
+# User-facing hints must use the short command.
+! grep -rqE '(exec|执行) bot-stack ' "$ROOT/assets/bin" "$ROOT/modules"
+
 # install-all must offer QR login; bot-stack qqlogin must pass through.
 grep -q '现在就扫码登录 QQ' "$ROOT/install-core.sh"
 grep -q 'qqlogin) exec /usr/local/bin/qqlogin' "$ROOT/install-core.sh"

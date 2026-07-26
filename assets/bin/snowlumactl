@@ -20,9 +20,9 @@ case "$command" in
   qq-restart) systemctl stop snowluma.service; systemctl restart snowluma-qq.service; systemctl --no-block start snowluma.service ;;
   qq-status) exec /usr/local/lib/bot-stack/qq-status ;;
   login) exec qqlogin ;;
-  configure-onebot) exec bot-stack configure-onebot ;;
-  update) exec bot-stack update-snowluma ;;
-  update-qq) exec bot-stack update-qq "${2:-}" ;;
-  doctor) exec bot-stack doctor ;;
+  configure-onebot) exec nbot configure-onebot ;;
+  update) exec nbot update-snowluma ;;
+  update-qq) exec nbot update-qq "${2:-}" ;;
+  doctor) exec nbot doctor ;;
   *) echo 'Usage: snowlumactl {start|stop|restart|status|logs|qq-start|qq-stop|qq-restart|qq-status|login|configure-onebot|update|update-qq|doctor}' >&2; exit 2 ;;
 esac

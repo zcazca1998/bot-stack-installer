@@ -26,6 +26,6 @@ case "$command" in
     printf 'Reverse proxy: https://your.domain/novnc/vnc.html (see novncctl proxy-example)\n'
     ;;
   proxy-example) cat /usr/local/lib/bot-stack/novnc-proxy.example ;;
-  update) exec bot-stack install-novnc ;;
+  update) exec nbot install-novnc ;;
   *) echo 'Usage: novncctl {start|stop|restart|status|logs|password|url|proxy-example|update}' >&2; exit 2 ;;
 esac
