@@ -76,6 +76,9 @@ grep -q 'journald.conf.d/bot-stack.conf' "$ROOT/install-core.sh"
 grep -q 'ASTRBOT_PORT:=' "$ROOT/assets/bin/astrbot-prepare"
 grep -q 'SNOWLUMA_WEBUI_PORT:=' "$ROOT/assets/bin/snowluma-launch"
 grep -q '^write_config$' "$ROOT/install.sh"
+# Never copy the git repository into the runtime location.
+grep -q 'exclude=./.git' "$ROOT/install.sh"
+grep -q 'exclude=./.git' "$ROOT/install-core.sh"
 
 # install-all must offer QR login; bot-stack qqlogin must pass through.
 grep -q '现在就扫码登录 QQ' "$ROOT/install-core.sh"

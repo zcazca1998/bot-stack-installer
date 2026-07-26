@@ -15,7 +15,9 @@ install_self() {
   if [[ "$SCRIPT_DIR" != "$target" ]]; then
     rm -rf "$target"
     mkdir -p "$target"
-    cp -a "$SCRIPT_DIR/." "$target/"
+    # 排除 .git：安装目标只需要运行时文件，仓库历史既占空间，
+    # 又会在源目录同时被 git 操作时导致复制报错。
+    tar -C "$SCRIPT_DIR" --exclude=./.git -cf - . | tar -C "$target" -xf -
   fi
   cat > /usr/local/sbin/bot-stack <<'EOF'
 #!/bin/sh

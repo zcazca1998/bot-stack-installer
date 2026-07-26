@@ -11,5 +11,6 @@ detect_arch
 write_config
 run_dir=$(mktemp -d)
 trap 'rm -rf "$run_dir"' EXIT
-cp -a "$SOURCE_DIR/." "$run_dir/"
+# 排除 .git：只需要运行时文件，且源目录被 git 操作时复制历史对象会失败。
+tar -C "$SOURCE_DIR" --exclude=./.git -cf - . | tar -C "$run_dir" -xf -
 bash "$run_dir/install-core.sh" "$@"
