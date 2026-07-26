@@ -182,16 +182,21 @@ mirrored_github_url() {
 github_fetch() {
   # Always download into a file: emitting a partial proxy response to stdout
   # and then retrying directly would concatenate two bodies.
-  local url=$1 output=${2:-} temp= rc=1 mirror mirror_url
+  local url=$1 output=${2:-} temp= rc=1 mirror mirror_url auth=()
   curl_args
   if [[ -z "$output" ]]; then
     temp=$(mktemp)
     output=$temp
   fi
+  # 有令牌就带上：匿名 API 每小时每 IP 仅 60 次，认证后是 5000 次。
+  # 只对 api.github.com 使用，避免把令牌发给第三方加速站。
+  if [[ -n "${GITHUB_TOKEN:-}" && "$url" == https://api.github.com/* ]]; then
+    auth=(--header "Authorization: Bearer ${GITHUB_TOKEN}")
+  fi
 
   if [[ "$GITHUB_ACCESS" != direct && -n "$GITHUB_PROXY" ]]; then
     info "Trying GitHub through proxy: $url" >&2
-    if curl "${CURL_ARGS[@]}" --output "$output" --proxy "$GITHUB_PROXY" "$url"; then
+    if curl "${CURL_ARGS[@]}" "${auth[@]}" --output "$output" --proxy "$GITHUB_PROXY" "$url"; then
       rc=0
     else
       warn "GitHub proxy failed."
@@ -215,7 +220,7 @@ github_fetch() {
 
   if ((rc != 0)) && [[ "$GITHUB_ACCESS" != proxy ]]; then
     info "Trying GitHub directly: $url" >&2
-    if curl "${CURL_ARGS[@]}" --output "$output" "$url"; then
+    if curl "${CURL_ARGS[@]}" "${auth[@]}" --output "$output" "$url"; then
       rc=0
     fi
   fi
@@ -237,9 +242,22 @@ github_latest_json() {
 }
 
 github_latest_tag() {
-  local repo=$1 json
-  json=$(github_latest_json "$repo")
-  jq -er '.tag_name' <<<"$json" || die "无法读取 ${repo} 最新版本。"
+  local repo=$1 json tag
+  json=$(github_latest_json "$repo") || json=
+  tag=$(jq -er '.tag_name' <<<"$json" 2>/dev/null) && { printf '%s\n' "$tag"; return 0; }
+  # 匿名调用 GitHub API 每小时每 IP 只有 60 次，共用出口 IP 或频繁重装很容易
+  # 触顶，返回 403 且响应体是 rate limit 提示。直接报「读不到版本」会让用户
+  # 以为是自己网络坏了。
+  # curl --fail 会在 403 时丢弃响应体，所以单独取一次错误内容来判别原因。
+  if [[ -z "$json" ]] && [[ "$GITHUB_ACCESS" != proxy ]]; then
+    json=$(curl -sS --max-time 15 "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null || true)
+  fi
+  if grep -qi 'rate limit\|API rate' <<<"$json" 2>/dev/null; then
+    warn "GitHub API 触发限流（匿名每小时 60 次）。"
+    warn "可等一小时后重试，或设置 GITHUB_TOKEN 环境变量提高配额："
+    warn "  sudo GITHUB_TOKEN=你的令牌 nbot install-astrbot"
+  fi
+  die "无法读取 ${repo} 最新版本。"
 }
 
 github_asset_url() {

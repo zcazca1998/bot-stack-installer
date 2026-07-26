@@ -37,6 +37,8 @@ jobs:
           bash tests/docs-check.sh
       - name: Release metadata check (GitHub API, may rate-limit)
         continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: bash tests/release-check.sh
       - name: ShellCheck (advisory)
         continue-on-error: true
@@ -51,6 +53,9 @@ jobs:
   astrbot-e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # 匿名 GitHub API 每小时每 IP 只有 60 次，反复跑 CI 很容易触顶。
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
       - name: Point data roots at /mnt
@@ -63,7 +68,7 @@ jobs:
           EOF
           sudo chmod 600 /etc/nbot.conf
       - name: Install AstrBot end to end
-        run: sudo ./install.sh install-astrbot
+        run: sudo GITHUB_TOKEN="$GITHUB_TOKEN" ./install.sh install-astrbot
       - name: Verify service and WebUI
         run: |
           systemctl is-active nbot-astrbot.service
@@ -93,7 +98,7 @@ jobs:
           grep -q '没有可回滚的版本' /tmp/rb.txt
           systemctl is-active nbot-astrbot.service
           # 再装一次以产生上一版，然后验证回滚双向可用。
-          sudo ./install.sh install-astrbot
+          sudo GITHUB_TOKEN="$GITHUB_TOKEN" ./install.sh install-astrbot
           test -d /mnt/nbot/astrbot/.app.previous
           before=$(sudo cat /mnt/nbot/astrbot/app/.nbot-version)
           sudo nbot astrbot rollback
@@ -259,6 +264,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.full_stack
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
       - name: Point data roots at /mnt and disable China-facing mirrors
@@ -273,7 +280,7 @@ jobs:
           sudo chmod 600 /etc/nbot.conf
           df -h /mnt
       - name: Install SnowLuma + QQ from the official image
-        run: sudo ./install.sh install-snowluma
+        run: sudo GITHUB_TOKEN="$GITHUB_TOKEN" ./install.sh install-snowluma
       - name: Verify QQ and SnowLuma services
         run: |
           systemctl is-active nbot-qq.service nbot-snowluma.service

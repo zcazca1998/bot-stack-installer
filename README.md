@@ -214,6 +214,22 @@ df -h /nbot
 镜像切换时已下载的 blob 会复用，不必从头再来。
 pip 的 `trusted-host` 自动从索引地址推导，填自建镜像也不用额外配置。
 
+### GitHub API 限流
+
+安装器要读 AstrBot 最新版本号，走的是 GitHub API——**匿名调用每个 IP 每小时
+只有 60 次**。共用出口 IP（校园网、公司网、部分云厂商）或短时间反复重装容易
+触顶，表现为「无法读取最新版本」。此时安装器会明确提示限流，两种解法：
+
+- 等一小时配额自动恢复
+- 用令牌提额到 5000 次/小时（令牌只发给 `api.github.com`，不会给加速站）：
+
+~~~bash
+sudo GITHUB_TOKEN=ghp_你的令牌 nbot install-astrbot
+~~~
+
+令牌在 GitHub → Settings → Developer settings → Personal access tokens 生成，
+**不需要勾任何权限**，公开仓库的只读调用用不到。
+
 ### 无人值守安装
 
 所有提问在没有终端时都会取默认值，因此可以完全自动化：

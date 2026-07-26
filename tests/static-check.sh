@@ -253,6 +253,11 @@ grep -q '\.app\.previous' "$ROOT/modules/astrbot.sh"
 grep -q 'rollback)' "$ROOT/install-core.sh"
 grep -q 'nbot astrbot rollback' "$ROOT/README.md"
 
+# GitHub API 匿名配额只有 60 次/小时，触顶要说清原因并支持令牌提额。
+grep -q 'GITHUB_TOKEN' "$ROOT/lib/common-base.sh"
+grep -q 'rate limit' "$ROOT/lib/common-base.sh"
+grep -q 'api.github.com' "$ROOT/lib/common-base.sh"
+
 # 许可与版本号是发布的前提。
 [[ -f "$ROOT/LICENSE" ]]
 grep -q 'GNU GENERAL PUBLIC LICENSE' "$ROOT/LICENSE"
