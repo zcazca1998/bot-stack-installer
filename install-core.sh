@@ -288,7 +288,12 @@ service_command() {
         novnc) install_novnc ;;
       esac
       ;;
-    password) [[ "$group" == novnc ]] && cat "$SNOWLUMA_ROOT/config/vnc-password" || die "仅 novnc 支持 password" ;;
+    password)
+      [[ "$group" == novnc ]] || die "仅 novnc 支持 password"
+      cat "$(vnc_password_file)" ;;
+    set-password)
+      [[ "$group" == novnc ]] || die "仅 novnc 支持 set-password"
+      set_vnc_password ;;
     url)
       [[ "$group" == novnc ]] || die "仅 novnc 支持 url"
       printf '本机:     http://127.0.0.1:%s/vnc.html\n' "$NOVNC_PORT"
@@ -297,7 +302,11 @@ service_command() {
     proxy-example)
       [[ "$group" == novnc ]] || die "仅 novnc 支持 proxy-example"
       cat /usr/local/lib/nbot/novnc-proxy.example ;;
-    *) die "用法: nbot $group {start|stop|restart|status|logs|update}" ;;
+    *)
+      if [[ "$group" == novnc ]]; then
+        die "用法: nbot novnc {start|stop|restart|status|logs|update|url|password|set-password|proxy-example}"
+      fi
+      die "用法: nbot $group {start|stop|restart|status|logs|update}" ;;
   esac
 }
 
@@ -330,7 +339,8 @@ QQ 登录
       nbot astrbot logs -n 200      查看最近 200 行
       nbot qq restart               重启 QQ（先停 SnowLuma 避免 Hook 悬空）
       nbot snowluma update          重新拆镜像更新 SnowLuma + QQ
-  noVNC 专属：nbot novnc url | password | proxy-example
+  noVNC 专属：nbot novnc url | password | set-password | proxy-example
+  Caddy：     nbot caddy set-auth | status | restart | logs
 
 状态与诊断
   status                全部服务状态总览
@@ -415,6 +425,15 @@ main() {
     install-snowluma|update-snowluma|install-qq|update-qq) install_snowluma ;;
     install-novnc|update-novnc) install_novnc ;;
     install-caddy|configure-caddy|update-caddy) install_caddy ;;
+    caddy)
+      case "${2:-}" in
+        set-auth|set-password) set_caddy_auth ;;
+        status) systemctl status caddy.service --no-pager -l ;;
+        restart) systemctl restart caddy.service ;;
+        logs) journalctl -u caddy.service --no-pager ;;
+        *) die "用法: nbot caddy {set-auth|status|restart|logs}" ;;
+      esac
+      ;;
     configure-onebot) configure_onebot ;;
     repair)
       install_runtime_assets

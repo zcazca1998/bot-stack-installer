@@ -103,6 +103,48 @@ ${tls_line}    basic_auth /novnc/* {
 EOF
 }
 
+set_caddy_auth() {
+  # 只改账号密码，不动域名、端口和证书配置。
+  local site_file password confirm_password hash tls_line='' site
+  site_file=$(caddy_site_file)
+  [[ -f "$site_file" ]] ||
+    die "尚未配置 Caddy，请先执行 nbot install-caddy。"
+  command -v caddy >/dev/null 2>&1 || die "未找到 caddy 命令。"
+
+  if nbot_interactive; then
+    prompt_default CADDY_AUTH_USER "网页登录账号" "$CADDY_AUTH_USER"
+    read -r -s -p '新的网页登录密码（留空自动生成）: ' password; echo
+    if [[ -n "$password" ]]; then
+      read -r -s -p '再输入一次确认: ' confirm_password; echo
+      [[ "$password" == "$confirm_password" ]] || die "两次输入不一致。"
+    fi
+  else
+    password=${NBOT_CADDY_PASSWORD:-}
+  fi
+  if [[ -z "$password" ]]; then
+    password=$(openssl rand -hex 9)
+    info "已自动生成新密码。"
+  fi
+  hash=$(caddy_hash_password "$password")
+  [[ -n "$hash" ]] || die "生成密码哈希失败。"
+
+  # 从现有站点文件里保留原有的站点标识与 tls 行。
+  site=$(sed -n '1,/{$/ s/ *{$//p' "$site_file" | tail -1)
+  [[ -n "$site" ]] || die "无法从 ${site_file} 解析站点配置。"
+  if grep -q '^    tls ' "$site_file"; then
+    tls_line=$(grep -m1 '^    tls ' "$site_file")$'\n'
+  fi
+
+  write_config
+  write_caddy_site "$site" "$CADDY_AUTH_USER" "$hash" "$tls_line"
+  caddy validate --config "$CADDY_CONF_DIR/Caddyfile" >/dev/null 2>&1 ||
+    die "Caddyfile 校验失败，配置未生效。"
+  systemctl reload caddy.service 2>/dev/null ||
+    systemctl restart caddy.service
+  info "登录账号：${CADDY_AUTH_USER}  密码：${password}"
+  warn "密码仅显示这一次，请立即保存。"
+}
+
 install_caddy() {
   local site tls_line='' pw='' hash='' existing_hash='' site_file code shown_pw=''
   [[ -f /etc/systemd/system/nbot-novnc.service ]] ||

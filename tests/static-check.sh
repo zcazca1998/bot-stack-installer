@@ -197,6 +197,13 @@ grep -q 'AmbientCapabilities=CAP_NET_BIND_SERVICE' "$ROOT/assets/systemd/caddy.s
 grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/caddy.service"
 grep -q 'caddy validate' "$ROOT/modules/caddy.sh"
 grep -q 'basic_auth /novnc/\*' "$ROOT/modules/caddy.sh"
+# Credentials must be changeable after install, not just viewable.
+grep -q 'set_vnc_password()' "$ROOT/modules/novnc.sh"
+grep -q 'set_caddy_auth()' "$ROOT/modules/caddy.sh"
+grep -q 'set-password)' "$ROOT/install-core.sh"
+grep -q 'set-auth|set-password)' "$ROOT/install-core.sh"
+# Reinstalling must not invalidate an existing VNC password.
+grep -q '已有密码保持不变' "$ROOT/modules/novnc.sh"
 grep -q 'reverse_proxy 127.0.0.1' "$ROOT/modules/caddy.sh"
 # IP access sends no SNI; an explicit self-signed cert must be used.
 grep -q 'novnc-selfsigned' "$ROOT/modules/caddy.sh"

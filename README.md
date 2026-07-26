@@ -79,13 +79,29 @@ nbot <组件> start|stop|restart|status|logs|update
 | `nbot qq restart` | 重启 QQ（会先停 SnowLuma，避免 Hook 悬空） |
 | `nbot snowluma update` | 重新拆镜像更新 SnowLuma + QQ |
 
-noVNC 另有三个专属动作：
+noVNC 与 Caddy 另有专属动作：
 
 | 命令 | 说明 |
 | --- | --- |
 | `nbot novnc url` | 显示访问地址 |
 | `nbot novnc password` | 查看 VNC 密码 |
+| `nbot novnc set-password` | 更换 VNC 密码（留空自动生成，改完立即生效） |
 | `nbot novnc proxy-example` | 打印 Nginx / Caddy 反代配置示例 |
+| `nbot caddy set-auth` | 更换网页登录账号 / 密码 |
+| `nbot caddy status` | Caddy 运行状态 |
+| `nbot caddy logs` | Caddy 日志 |
+
+### 凭据一览
+
+| 凭据 | 安装时 | 之后 |
+| --- | --- | --- |
+| AstrBot WebUI | 固定 `astrbot` / `astrbot` | 在 WebUI 内自行修改 |
+| VNC 密码 | 自动生成并显示，**无需自己想** | `nbot novnc password` 查看，`set-password` 更换 |
+| Caddy 网页登录 | 安装时可自填，留空则随机生成 | 只存 bcrypt 哈希，**无法查看**，用 `nbot caddy set-auth` 重设 |
+| OneBot token | `configure-onebot` 时显示 | 可从 SnowLuma 配置文件读取 |
+
+安装全程**只需要输入一次密码**（Caddy 的网页登录），VNC 密码一律自动生成——
+它上限只有 8 位、又被 Caddy 挡在内网后面，让用户单独记一个没有意义。
 
 ### 状态与诊断
 
