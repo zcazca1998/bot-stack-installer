@@ -303,3 +303,9 @@ CI（`.github/workflows/ci.yml`）：
 用于人工验证扫码登录这类无法自动化的流程。
 
 踩坑记录见 [PITFALLS.md](PITFALLS.md)。
+
+---
+
+## 许可
+
+[GPL-3.0](LICENSE)。衍生作品需以相同许可开源。

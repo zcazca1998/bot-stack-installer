@@ -230,4 +230,11 @@ grep -q 'set-password)' "$ROOT/install-core.sh"
 grep -q 'reverse_proxy 127.0.0.1' "$ROOT/modules/caddy.sh"
 # IP access sends no SNI; an explicit self-signed cert must be used.
 grep -q 'novnc-selfsigned' "$ROOT/modules/caddy.sh"
+# 许可与版本号是发布的前提。
+[[ -f "$ROOT/LICENSE" ]]
+grep -q 'GNU GENERAL PUBLIC LICENSE' "$ROOT/LICENSE"
+grep -q 'Version 3' "$ROOT/LICENSE"
+grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$' "$ROOT/VERSION"
+grep -q 'GPL-3.0' "$ROOT/README.md"
+
 echo 'Static checks passed.'
