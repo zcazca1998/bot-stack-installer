@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -u
+source /etc/bot-stack.conf
+cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+deadline=$(( $(date +%s) + 25 ))
+
+while (( $(date +%s) < deadline )); do
+  state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+  [[ "$state" == logged-in ]] && exit 0
+  [[ "$state" == quick-login && -r "$cgroup" ]] || { sleep 2; continue; }
+  xvfb_pid=
+  while read -r pid; do
+    [[ -r "/proc/$pid/comm" ]] || continue
+    [[ $(<"/proc/$pid/comm") == Xvfb ]] && { xvfb_pid=$pid; break; }
+  done < "$cgroup"
+  [[ -n "$xvfb_pid" ]] || { sleep 2; continue; }
+  mapfile -d '' -t args < "/proc/$xvfb_pid/cmdline"
+  display= auth=
+  for ((i=0; i<${#args[@]}; i++)); do
+    [[ ${args[$i]} =~ ^:[0-9]+$ ]] && display=${args[$i]}
+    [[ ${args[$i]} == -auth ]] && auth=${args[$((i+1))]:-}
+  done
+  [[ -n "$display" && -r "$auth" ]] || { sleep 2; continue; }
+  window=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null | tail -1 || true)
+  [[ -n "$window" ]] || { sleep 2; continue; }
+  geometry=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$window" 2>/dev/null || true)
+  width=$(sed -n 's/^WIDTH=//p' <<<"$geometry")
+  height=$(sed -n 's/^HEIGHT=//p' <<<"$geometry")
+  [[ "$width" == 320 && "$height" == 460 ]] || { sleep 2; continue; }
+  DISPLAY="$display" XAUTHORITY="$auth" xdotool mousemove --window "$window" 160 328 click 1
+  logger -t snowluma 'QQ quick-login button clicked once; waiting for login state'
+  exit 0
+done
+logger -t snowluma 'No safe QQ quick-login action was available; manual qqlogin may be required'
+exit 0

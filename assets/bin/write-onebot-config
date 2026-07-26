@@ -1,0 +1,37 @@
+const fs = require("fs");
+const path = require("path");
+
+let fileConfig = "";
+try { fileConfig = fs.readFileSync("/etc/bot-stack.conf", "utf8"); } catch {}
+const readSetting = (name, fallback) => {
+  const match = fileConfig.match(new RegExp(`^${name}=([^\\r\\n]+)$`, "m"));
+  return match ? match[1].replace(/^['\"]|['\"]$/g, "") : fallback;
+};
+const root = process.env.SNOWLUMA_ROOT || readSetting("SNOWLUMA_ROOT", "/snowluma");
+const uin = process.env.QQ_UIN;
+const token = process.env.ONEBOT_TOKEN;
+const httpPort = Number(process.env.ONEBOT_HTTP_PORT || readSetting("ONEBOT_HTTP_PORT", "3005"));
+const wsPort = Number(process.env.ASTRBOT_WS_PORT || readSetting("ASTRBOT_WS_PORT", "6199"));
+if (!root || !uin || !token || !Number.isSafeInteger(httpPort) || !Number.isSafeInteger(wsPort)) {
+  throw new Error("Missing OneBot configuration environment");
+}
+
+const target = path.join(root, "data", "config", `onebot_${uin}.json`);
+let current = {};
+try { current = JSON.parse(fs.readFileSync(target, "utf8")); } catch {}
+const config = {
+  mode: current.mode || "snapshot",
+  networks: {
+    httpServers: [{ name: "local-http", accessToken: token, messageFormat: "array", reportSelfMessage: false, host: "127.0.0.1", port: httpPort, path: "/" }],
+    httpClients: [],
+    wsServers: [],
+    wsClients: [{ name: "AstrBot", accessToken: token, messageFormat: "array", reportSelfMessage: true, url: `ws://127.0.0.1:${wsPort}/ws`, role: "Universal", reconnectIntervalMs: 30000 }],
+  },
+  statusCommand: current.statusCommand || { enabled: true, swallow: false, cooldownSeconds: 5, trigger: "#sl" },
+  notifications: current.notifications || { channelIds: [] },
+};
+fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 });
+const temp = `${target}.tmp`;
+fs.writeFileSync(temp, `${JSON.stringify(config, null, 2)}\n`, { mode: 0o600 });
+fs.renameSync(temp, target);
+console.log(`Configured OneBot for UIN ${uin}`);

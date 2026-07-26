@@ -1,0 +1,20 @@
+[Unit]
+Description=Linux QQ extracted from the official SnowLuma image
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=snowluma
+Group=snowluma
+ExecStart=/usr/local/lib/bot-stack/qq-launch
+Restart=on-abnormal
+RestartSec=10
+KillMode=control-group
+KillSignal=SIGTERM
+TimeoutStartSec=45
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

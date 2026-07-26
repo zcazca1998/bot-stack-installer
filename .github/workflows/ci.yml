@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      full_stack:
+        description: 'Run the full SnowLuma image + noVNC + Caddy install test (heavy)'
+        type: boolean
+        default: false
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: |
+          for f in install.sh install-core.sh lib/*.sh modules/*.sh tests/*.sh assets/bin/*; do
+            [[ "$f" == *write-onebot-config ]] && continue
+            bash -n "$f"
+          done
+          node --check assets/bin/write-onebot-config
+      - name: Offline test suite
+        run: |
+          bash tests/static-check.sh
+          bash tests/arch-check.sh
+          bash tests/common-check.sh
+          bash tests/onebot-check.sh
+          bash tests/image-fallback-check.sh
+          bash tests/github-fetch-check.sh
+          bash tests/caddy-config-check.sh
+      - name: Release metadata check (GitHub API, may rate-limit)
+        continue-on-error: true
+        run: bash tests/release-check.sh
+      - name: ShellCheck (advisory)
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          files=(install.sh install-core.sh lib/*.sh modules/*.sh tests/*.sh)
+          for f in assets/bin/*; do
+            [[ "$f" == *write-onebot-config ]] || files+=("$f")
+          done
+          shellcheck -x -S warning "${files[@]}"
+
+  astrbot-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install AstrBot end to end
+        run: sudo ./install.sh install-astrbot
+      - name: Verify service and WebUI
+        run: |
+          systemctl is-active astrbot.service
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:6185/; then exit 0; fi
+            sleep 2
+          done
+          echo 'WebUI did not answer within 60s' >&2
+          exit 1
+      - name: bot-stack status and doctor
+        run: |
+          sudo bot-stack status
+          sudo bot-stack doctor
+      - name: Logs on failure
+        if: failure()
+        run: sudo journalctl -u astrbot.service -n 200 --no-pager || true
+
+  full-stack:
+    if: github.event_name == 'workflow_dispatch' && inputs.full_stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Point data roots at /mnt and disable China-facing mirrors
+        run: |
+          sudo tee /etc/bot-stack.conf >/dev/null <<'EOF'
+          ASTRBOT_ROOT=/mnt/AstrBot
+          SNOWLUMA_ROOT=/mnt/snowluma
+          SNOWLUMA_PAYLOAD_ROOT=/mnt/AstrBot/.bot-stack/snowluma
+          SNOWLUMA_IMAGE_MIRROR=
+          SNOWLUMA_IMAGE_FALLBACK_MIRROR=
+          EOF
+          sudo chmod 600 /etc/bot-stack.conf
+          df -h /mnt
+      - name: Install SnowLuma + QQ from the official image
+        run: sudo ./install.sh install-snowluma
+      - name: Verify QQ and SnowLuma services
+        run: |
+          systemctl is-active snowluma-qq.service snowluma.service
+          sudo /usr/local/lib/bot-stack/qq-status || true
+      - name: Install noVNC (defaults, decline Caddy prompt)
+        run: printf '\n\nn\n' | sudo ./install.sh install-novnc
+      - name: Install Caddy (self-signed defaults)
+        run: printf '\n\n\n\n' | sudo ./install.sh install-caddy
+      - name: Verify reverse proxy chain (expect 401 without credentials)
+        run: |
+          code=$(curl -ks -o /dev/null -w '%{http_code}' https://127.0.0.1:8443/novnc/vnc.html)
+          [ "$code" = 401 ]
+      - name: Logs on failure
+        if: failure()
+        run: |
+          sudo journalctl -u snowluma-qq.service -u snowluma.service \
+            -u snowluma-vnc.service -u snowluma-novnc.service -u caddy.service \
+            -n 300 --no-pager || true
+          df -h || true

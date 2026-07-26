@@ -1,0 +1,20 @@
+[Unit]
+Description=AstrBot service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStartPre=/usr/local/lib/bot-stack/astrbot-prepare
+ExecStart=/usr/local/lib/bot-stack/astrbot-launch
+Restart=on-abnormal
+RestartSec=10
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStartSec=120
+TimeoutStopSec=30
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

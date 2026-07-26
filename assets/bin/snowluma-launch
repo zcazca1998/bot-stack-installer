@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+export HOME="$SNOWLUMA_ROOT/home"
+export XDG_CONFIG_HOME="$SNOWLUMA_ROOT/config"
+export XDG_CACHE_HOME="$SNOWLUMA_ROOT/cache"
+export XDG_DATA_HOME="$SNOWLUMA_ROOT/data"
+export XDG_RUNTIME_DIR="$SNOWLUMA_ROOT/run/session"
+export TMPDIR="$SNOWLUMA_ROOT/tmp"
+export DISPLAY=:91
+export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/dbus.sock"
+export SNOWLUMA_WEBUI_HOST=0.0.0.0
+export SNOWLUMA_WEBUI_PORT
+export SNOWLUMA_HOOK_AUTOLOAD=1
+export SNOWLUMA_HOOK_RUNTIME_DIR="$SNOWLUMA_ROOT/run/hook"
+export SNOWLUMA_LOG_DIR="$SNOWLUMA_ROOT/logs"
+if [[ ${SNOWLUMA_ACCEPT_TERMS:-0} == 1 ]]; then
+  export SNOWLUMA_ACCEPT_EULA=1 SNOWLUMA_ACCEPT_PRIVACY=1
+fi
+
+# Allow up to 60s: slow boards can take a while to bring up Xvfb/D-Bus, and
+# Restart=on-abnormal will not revive us after a clean non-zero exit.
+for _ in {1..600}; do
+  [[ -S "$XDG_RUNTIME_DIR/dbus.sock" && -S /tmp/.X11-unix/X91 ]] && break
+  sleep 0.1
+done
+[[ -S "$XDG_RUNTIME_DIR/dbus.sock" ]] || { echo "QQ D-Bus session is not ready" >&2; exit 3; }
+[[ -S /tmp/.X11-unix/X91 ]] || { echo "QQ Xvfb display is not ready" >&2; exit 3; }
+
+mkdir -p "$SNOWLUMA_ROOT/data"
+cd "$SNOWLUMA_ROOT/data"
+exec "$SNOWLUMA_PAYLOAD_ROOT/runtime/node" "$SNOWLUMA_ROOT/app/index.mjs"

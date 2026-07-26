@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+failures=/run/astrbot-watchdog.failures
+grace=/run/astrbot-watchdog.grace
+
+systemctl is-active --quiet astrbot.service || { rm -f "$failures" "$grace"; exit 0; }
+pid=$(systemctl show astrbot.service -p MainPID --value)
+[[ "$pid" =~ ^[1-9][0-9]*$ ]] || exit 0
+now=$(date +%s)
+read -r grace_pid grace_time < "$grace" 2>/dev/null || { grace_pid=; grace_time=0; }
+[[ "$grace_time" =~ ^[0-9]+$ ]] || grace_time=0
+if [[ "$grace_pid" != "$pid" ]]; then
+  printf '%s %s\n' "$pid" "$now" > "$grace"
+  rm -f "$failures"
+  exit 0
+fi
+((now - grace_time >= 120)) || exit 0
+
+if curl -fsS --max-time 8 -o /dev/null "http://127.0.0.1:${ASTRBOT_PORT}/"; then
+  rm -f "$failures"
+  exit 0
+fi
+if [[ -r "$failures" ]]; then count=$(<"$failures"); else count=0; fi
+count=$((count + 1)); printf '%s\n' "$count" > "$failures"
+if ((count >= 3)); then
+  logger -t astrbot-watchdog "WebUI ${ASTRBOT_PORT} failed 3 checks while process ${pid} stayed alive; restarting hung service"
+  rm -f "$failures" "$grace"
+  systemctl restart astrbot.service
+fi

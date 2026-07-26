@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+quiet=0
+case "${1:-}" in
+  "") ;;
+  -q|--quiet) quiet=1 ;;
+  *) echo 'Usage: qqrefresh [-q]' >&2; exit 2 ;;
+esac
+cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+[[ -r "$cgroup" ]] || { echo 'SnowLuma QQ cgroup is unavailable' >&2; exit 1; }
+xvfb_pid=
+while read -r pid; do
+  [[ -r "/proc/$pid/comm" ]] || continue
+  [[ $(<"/proc/$pid/comm") == Xvfb ]] && { xvfb_pid=$pid; break; }
+done < "$cgroup"
+[[ -n "$xvfb_pid" ]] || { echo 'Xvfb process was not found' >&2; exit 1; }
+mapfile -d '' -t args < "/proc/$xvfb_pid/cmdline"
+display= auth=
+for ((i=0; i<${#args[@]}; i++)); do
+  [[ ${args[$i]} =~ ^:[0-9]+$ ]] && display=${args[$i]}
+  [[ ${args[$i]} == -auth ]] && auth=${args[$((i+1))]:-}
+done
+export DISPLAY=$display XAUTHORITY=$auth
+window=$(xdotool search --onlyvisible --name '^QQ$' 2>/dev/null | tail -1 || true)
+[[ -n "$window" ]] || { ((quiet)) || echo 'QQ login window was not found'; exit 1; }
+geometry=$(xdotool getwindowgeometry --shell "$window")
+width=$(sed -n 's/^WIDTH=//p' <<<"$geometry")
+height=$(sed -n 's/^HEIGHT=//p' <<<"$geometry")
+[[ "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]] || { echo 'Invalid QQ window geometry' >&2; exit 1; }
+if ((width < 260 || width > 500 || height < 360 || height > 650)); then
+  ((quiet)) || echo "QQ is not showing the login window (${width}x${height}); no click performed"
+  exit 1
+fi
+xdotool mousemove --window "$window" $((width / 2)) $((height * 45 / 100)) click 1
+((quiet)) || echo "Clicked QQ QR refresh area in ${width}x${height} login window"

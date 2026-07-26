@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+cd "$ASTRBOT_ROOT"
+export PYTHONPATH="$ASTRBOT_ROOT/app"
+config="$ASTRBOT_ROOT/data/cmd_config.json"
+if [[ ! -f "$config" ]]; then
+  "$ASTRBOT_ROOT/.venv/bin/python" -m astrbot.cli init
+fi
+CONFIG_PATH=$config DASHBOARD_PORT=$ASTRBOT_PORT "$ASTRBOT_ROOT/.venv/bin/python" <<'PY'
+import json
+import os
+from pathlib import Path
+
+path = Path(os.environ["CONFIG_PATH"])
+config = json.loads(path.read_text(encoding="utf-8"))
+dashboard = config.setdefault("dashboard", {})
+port = int(os.environ["DASHBOARD_PORT"])
+if dashboard.get("port") != port:
+    dashboard["port"] = port
+    temp = path.with_suffix(".json.tmp")
+    temp.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temp.chmod(0o600)
+    temp.replace(path)
+PY

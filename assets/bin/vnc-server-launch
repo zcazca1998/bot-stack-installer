@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+NOVNC_VNC_PORT=${NOVNC_VNC_PORT:-5901}
+auth="$SNOWLUMA_ROOT/run/session/Xauthority"
+passwd_file="$SNOWLUMA_ROOT/config/vnc-password"
+
+[[ -s "$passwd_file" ]] || { echo 'VNC password file is missing; run bot-stack install-novnc' >&2; exit 3; }
+
+# qq-launch owns the display; wait for Xvfb :91 and its Xauthority. Exit 0 on
+# timeout so systemd stays quiet while QQ is stopped: WantedBy=snowluma-qq
+# starts this bridge again on the next QQ start.
+for _ in {1..3000}; do
+  [[ -S /tmp/.X11-unix/X91 && -r "$auth" ]] && break
+  sleep 0.1
+done
+if [[ ! -S /tmp/.X11-unix/X91 || ! -r "$auth" ]]; then
+  echo 'QQ Xvfb display :91 did not appear; VNC bridge will start with the next QQ start' >&2
+  exit 0
+fi
+
+# -localhost keeps the raw VNC port off the network; only websockify and
+# local tools may connect. The reverse proxy fronts noVNC, never this port.
+exec x11vnc -display :91 -auth "$auth" -localhost -rfbport "$NOVNC_VNC_PORT" \
+  -passwdfile "$passwd_file" -forever -shared -noxdamage -quiet

@@ -1,0 +1,154 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-/snowluma}
+
+usage() {
+  echo '用法: qqlogin [--fresh]'
+  echo '  --fresh  先重启 QQ 并清除过期登录态，强制回到扫码页（被踢下线/登录过期时使用）'
+}
+
+fresh=0
+case "${1:-}" in
+  "") ;;
+  --fresh) fresh=1 ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage >&2; exit 2 ;;
+esac
+[[ -t 1 ]] || { echo 'qqlogin 需要交互式终端' >&2; exit 1; }
+[[ ${EUID:-$(id -u)} -eq 0 ]] || { echo '请使用 root 运行 qqlogin' >&2; exit 1; }
+for command in ffmpeg xdotool zbarimg qrencode; do
+  command -v "$command" >/dev/null || { echo "缺少命令：$command，请执行 bot-stack repair" >&2; exit 1; }
+done
+
+cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+login_file="$SNOWLUMA_ROOT/config/QQ/auth/login.enc"
+
+restart_qq() {
+  # clear_state=1: also back up login.enc so QQ boots straight into the QR
+  # page instead of an expired quick-login list or an "expired" dialog.
+  local clear_state=$1
+  systemctl stop snowluma.service 2>/dev/null || true
+  systemctl stop snowluma-qq.service 2>/dev/null || true
+  if ((clear_state)) && [[ -f "$login_file" ]]; then
+    mv -f "$login_file" "${login_file}.expired.bak"
+    echo "已备份并清除过期登录态：${login_file}.expired.bak"
+  fi
+  systemctl start snowluma-qq.service ||
+    { echo 'snowluma-qq.service 启动失败，请查看 snowlumactl logs' >&2; exit 1; }
+  systemctl --no-block start snowluma.service 2>/dev/null || true
+  sleep 5
+}
+
+service_state=$(systemctl is-active snowluma-qq.service 2>/dev/null || true)
+if [[ "$service_state" != active && "$service_state" != activating ]]; then
+  read -r -p 'snowluma-qq.service 未运行，现在启动？[Y/n] ' answer
+  [[ "${answer:-Y}" =~ ^[Yy] ]] || exit 1
+  systemctl start snowluma-qq.service ||
+    { echo 'snowluma-qq.service 启动失败，请查看 snowlumactl logs' >&2; exit 1; }
+  systemctl --no-block start snowluma.service 2>/dev/null || true
+fi
+
+if ((fresh == 0)); then
+  state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+  if [[ "$state" == logged-in ]]; then
+    # login.enc can still claim logged-in after the account was kicked;
+    # only the OneBot get_status probe tells the truth.
+    online=$(/usr/local/lib/bot-stack/qq-status --machine 2>/dev/null || echo unknown)
+    if [[ "$online" == online ]]; then
+      echo 'QQ 已登录且在线，无需重新扫码。'
+      exit 0
+    fi
+    echo "本地登录态显示已登录，但实际状态为 ${online}：账号可能被踢下线或会话已过期。"
+    read -r -p '重启 QQ 并清除过期登录态，重新扫码登录？[Y/n] ' answer
+    [[ "${answer:-Y}" =~ ^[Yy] ]] || exit 0
+    fresh=1
+  fi
+fi
+((fresh == 0)) || restart_qq 1
+
+tmp=$(mktemp /dev/shm/qqlogin.XXXXXX.png)
+cleanup() { rm -f "$tmp"; printf '\033[0m\033[?25h'; }
+trap cleanup EXIT
+trap 'exit 130' HUP INT TERM
+
+display= auth=
+resolve_display() {
+  # Re-resolve every capture: PIDs and the X cookie change on every QQ
+  # restart, only the paths stay stable.
+  display= auth=
+  [[ -r "$cgroup" ]] || return 1
+  local pid xvfb_pid= args i
+  while read -r pid; do
+    [[ -r "/proc/$pid/comm" ]] || continue
+    [[ $(<"/proc/$pid/comm") == Xvfb ]] && { xvfb_pid=$pid; break; }
+  done < "$cgroup"
+  [[ -n "$xvfb_pid" ]] || return 1
+  mapfile -d '' -t args < "/proc/$xvfb_pid/cmdline"
+  for ((i=0; i<${#args[@]}; i++)); do
+    [[ ${args[$i]} =~ ^:[0-9]+$ ]] && display=${args[$i]}
+    [[ ${args[$i]} == -auth ]] && auth=${args[$((i+1))]:-}
+  done
+  [[ -n "$display" && -r "$auth" ]]
+}
+
+capture_and_decode() {
+  local window geometry x y width height
+  resolve_display || return 1
+  window=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' 2>/dev/null | tail -1 || true)
+  [[ -n "$window" ]] || return 1
+  geometry=$(DISPLAY="$display" XAUTHORITY="$auth" xdotool getwindowgeometry --shell "$window")
+  x=$(sed -n 's/^X=//p' <<<"$geometry"); y=$(sed -n 's/^Y=//p' <<<"$geometry")
+  width=$(sed -n 's/^WIDTH=//p' <<<"$geometry"); height=$(sed -n 's/^HEIGHT=//p' <<<"$geometry")
+  [[ "$x:$y:$width:$height" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+$ ]] || return 1
+  ((width >= 260 && width <= 500 && height >= 360 && height <= 650)) || return 1
+  DISPLAY="$display" XAUTHORITY="$auth" ffmpeg -hide_banner -loglevel error -y \
+    -f x11grab -video_size "${width}x${height}" -i "${display}+${x},${y}" \
+    -vf "scale=$((width * 4)):$((height * 4)):flags=neighbor" -frames:v 1 "$tmp"
+  zbarimg --quiet --raw --set '*.enable=0' --set 'qrcode.enable=1' "$tmp" 2>/dev/null
+}
+
+printf '\033[?25l'
+ticks=0
+qrless=0
+stage=0
+while :; do
+  if [[ $(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || true) == logged-in ]]; then
+    printf '\033[0m\033[H\033[2JQQ 登录成功。\n'
+    exit 0
+  fi
+  cols=$(tput cols 2>/dev/null || echo 0); lines=$(tput lines 2>/dev/null || echo 0)
+  if ((cols < 74 || lines < 40)); then
+    printf '\033[0m\033[H\033[2J'
+    printf '终端窗口太小，无法显示可扫描的二维码。\n需要：74 列 x 40 行\n当前：%s 列 x %s 行\n' "$cols" "$lines"
+    sleep 3; continue
+  fi
+  if ((ticks >= 5)); then /usr/local/bin/qqrefresh -q >/dev/null 2>&1 || true; ticks=0; sleep 1; fi
+  payload=$(capture_and_decode || true)
+  if [[ -z "$payload" ]]; then
+    /usr/local/bin/qqrefresh -q >/dev/null 2>&1 || true; sleep 1
+    payload=$(capture_and_decode || true)
+  fi
+  printf '\033[0m\033[H\033[2JQQ 扫码登录 | 每 3 秒刷新 | %s | Ctrl+C 退出\n\n' "$(date '+%F %T')"
+  if [[ -n "$payload" ]]; then
+    qrless=0
+    printf '%s' "$payload" | qrencode -t ANSI -l L -m 2 -o -
+  else
+    ((qrless += 1))
+    if ((qrless >= 8 && stage == 0)); then
+      stage=1; qrless=0; ticks=0
+      printf '较长时间未捕获到二维码，正在重启 QQ 以清除可能的「登录已过期」弹窗...\n'
+      restart_qq 0
+    elif ((qrless >= 8 && stage == 1)); then
+      stage=2; qrless=0; ticks=0
+      printf '重启后仍无二维码，清除过期登录态后再次重启，强制回到扫码页...\n'
+      restart_qq 1
+    elif ((stage >= 2 && qrless >= 8)); then
+      printf '仍未出现二维码。请检查日志：snowlumactl logs -n 100\n也可 Ctrl+C 退出后重试 qqlogin --fresh\n'
+    else
+      printf '等待可解码的 QQ 二维码...\n'
+    fi
+  fi
+  ((ticks += 1))
+  sleep 3
+done

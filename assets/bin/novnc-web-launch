@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+NOVNC_PORT=${NOVNC_PORT:-6080}
+NOVNC_VNC_PORT=${NOVNC_VNC_PORT:-5901}
+
+web=
+for candidate in /usr/share/novnc /usr/share/webapps/novnc; do
+  [[ -f "$candidate/vnc.html" ]] && { web=$candidate; break; }
+done
+[[ -n "$web" ]] || { echo 'noVNC web root was not found; install the novnc package' >&2; exit 3; }
+
+# Bound to 127.0.0.1 by design: a reverse proxy terminates TLS and auth in
+# front of this. --heartbeat keeps idle WebSocket sessions alive through
+# proxy idle timeouts. noVNC uses relative URLs, so serving it under a
+# sub-path such as /novnc/ works without extra configuration.
+exec websockify --heartbeat 30 --web "$web" \
+  "127.0.0.1:${NOVNC_PORT}" "127.0.0.1:${NOVNC_VNC_PORT}"

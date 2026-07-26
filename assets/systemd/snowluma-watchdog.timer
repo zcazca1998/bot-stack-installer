@@ -1,0 +1,11 @@
+[Unit]
+Description=SnowLuma and QQ health-check timer
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=false
+
+[Install]
+WantedBy=timers.target

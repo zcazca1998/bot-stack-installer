@@ -1,0 +1,6 @@
+[Unit]
+Description=SnowLuma and QQ health check
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/bot-stack/snowluma-healthcheck

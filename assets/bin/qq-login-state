@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+node="$SNOWLUMA_PAYLOAD_ROOT/runtime/node"
+login_file="$SNOWLUMA_ROOT/config/QQ/auth/login.enc"
+[[ -x "$node" ]] || { echo unknown; exit 0; }
+MODE=${1:---machine} LOGIN_FILE=$login_file QQ_UIN=${QQ_UIN:-} "$node" <<'NODE'
+const fs = require("fs");
+const mode = process.env.MODE;
+try {
+  const config = JSON.parse(fs.readFileSync(process.env.LOGIN_FILE, "utf8"));
+  const accounts = config.loginList || [];
+  const preferred = process.env.QQ_UIN;
+  const account = (preferred && accounts.find((item) => String(item.uin) === preferred))
+    || accounts.find((item) => item.isUserLogin === true)
+    || accounts.find((item) => item.isQuickLogin === true)
+    || accounts[0];
+  if (mode === "--uin") process.stdout.write(account ? String(account.uin) : "");
+  else if (!account) process.stdout.write("unknown");
+  else if (account.isUserLogin === true) process.stdout.write("logged-in");
+  else if (account.isQuickLogin === true) process.stdout.write("quick-login");
+  else process.stdout.write("waiting-login");
+} catch {
+  process.stdout.write(mode === "--uin" ? "" : "unknown");
+}
+NODE
+printf '\n'

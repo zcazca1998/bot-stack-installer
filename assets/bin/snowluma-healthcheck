@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+web_fail=/run/snowluma-watchdog.web-failures
+hook_fail=/run/snowluma-watchdog.hook-failures
+qq_fail=/run/snowluma-watchdog.qq-failures
+grace=/run/snowluma-watchdog.session-grace
+offline_attempted=/run/snowluma-watchdog.offline-recovery-attempted
+
+increment() {
+  local file=$1 count
+  if [[ -r "$file" ]]; then count=$(<"$file"); else count=0; fi
+  [[ "$count" =~ ^[0-9]+$ ]] || count=0
+  count=$((count + 1)); echo "$count" > "$file"; echo "$count"
+}
+restart_snowluma() {
+  logger -t snowluma-watchdog "$1; restarting SnowLuma only"
+  rm -f "$web_fail" "$hook_fail"
+  systemctl --no-block restart snowluma.service
+}
+restart_stack() {
+  logger -t snowluma-watchdog "$1; restarting QQ and SnowLuma once to recover the account session"
+  rm -f "$web_fail" "$hook_fail" "$qq_fail" "$grace"
+  systemctl stop snowluma.service
+  systemctl restart snowluma-qq.service
+  systemctl --no-block start snowluma.service
+}
+
+qq_state=$(systemctl is-active snowluma-qq.service 2>/dev/null || true)
+snow_state=$(systemctl is-active snowluma.service 2>/dev/null || true)
+
+# QQ runtime protection runs first and does not depend on SnowLuma being
+# alive: a broken Xvfb/D-Bus must be recovered even while SnowLuma is down.
+qq_pid=
+xvfb_ok=0
+if [[ "$qq_state" == active ]]; then
+  cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
+  if [[ -r "$cgroup" ]]; then
+    while read -r pid; do
+      [[ -r "/proc/$pid/comm" ]] || continue
+      [[ $(<"/proc/$pid/comm") != Xvfb ]] || xvfb_ok=1
+      [[ $(<"/proc/$pid/comm") == qq ]] || continue
+      mapfile -d '' -t args < "/proc/$pid/cmdline"
+      [[ " ${args[*]} " == *' --type='* ]] || qq_pid=$pid
+    done < "$cgroup"
+  fi
+  if [[ -z "$qq_pid" || "$xvfb_ok" != 1 || ! -S "$SNOWLUMA_ROOT/run/session/dbus.sock" ]]; then
+    count=$(increment "$qq_fail")
+    if ((count >= 3)); then rm -f "$offline_attempted"; restart_stack 'QQ, Xvfb, or D-Bus runtime is missing'; fi
+    exit 0
+  fi
+  rm -f "$qq_fail"
+else
+  # Service intentionally stopped: never let a stale count trigger an early
+  # restart after the next start.
+  rm -f "$qq_fail"
+fi
+
+if [[ "$snow_state" != active ]]; then rm -f "$web_fail" "$hook_fail"; exit 0; fi
+if ! curl -fsS --max-time 8 -o /dev/null "http://127.0.0.1:${SNOWLUMA_WEBUI_PORT}/"; then
+  count=$(increment "$web_fail")
+  ((count < 3)) || restart_snowluma "WebUI ${SNOWLUMA_WEBUI_PORT} failed 3 checks"
+  exit 0
+fi
+rm -f "$web_fail"
+
+[[ "$qq_state" == active ]] || exit 0
+if [[ ! -S "$SNOWLUMA_ROOT/run/hook/mojo.${qq_pid}.control.sock" || ! -S "$SNOWLUMA_ROOT/run/hook/mojo.${qq_pid}.recv.sock" ]]; then
+  count=$(increment "$hook_fail")
+  ((count < 3)) || restart_snowluma "Hook IPC for QQ PID ${qq_pid} failed 3 checks"
+  exit 0
+fi
+rm -f "$hook_fail"
+
+now=$(date +%s)
+read -r grace_pid grace_time < "$grace" 2>/dev/null || { grace_pid=; grace_time=0; }
+[[ "$grace_time" =~ ^[0-9]+$ ]] || grace_time=0
+if [[ "$grace_pid" != "$qq_pid" ]]; then printf '%s %s\n' "$qq_pid" "$now" > "$grace"; exit 0; fi
+((now - grace_time >= 90)) || exit 0
+status=$(/usr/local/lib/bot-stack/qq-status --machine 2>/dev/null || echo api-error)
+case "$status" in
+  online) rm -f "$offline_attempted" ;;
+  offline|session-unavailable)
+    if [[ ! -e "$offline_attempted" ]]; then
+      date -Is > "$offline_attempted"
+      restart_stack "QQ account state is ${status}"
+    fi
+    ;;
+esac

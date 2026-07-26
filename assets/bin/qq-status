@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+source /etc/bot-stack.conf
+machine=0
+[[ ${1:-} == --machine ]] && machine=1
+
+if ! systemctl is-active --quiet snowluma-qq.service; then
+  status=service-down
+elif [[ $(systemctl is-active snowluma.service 2>/dev/null || true) != active ]]; then
+  login_state=$(/usr/local/lib/bot-stack/qq-login-state --machine 2>/dev/null || echo unknown)
+  [[ "$login_state" == logged-in ]] && status=snowluma-down || status=waiting-login
+else
+  uin=$(/usr/local/lib/bot-stack/qq-login-state --uin 2>/dev/null || true)
+  status=$(SNOWLUMA_ROOT=$SNOWLUMA_ROOT UIN=$uin "$SNOWLUMA_PAYLOAD_ROOT/runtime/node" <<'NODE'
+const fs = require("fs");
+(async () => {
+  try {
+    const root = process.env.SNOWLUMA_ROOT;
+    const uin = process.env.UIN;
+    const config = JSON.parse(fs.readFileSync(`${root}/data/config/onebot_${uin}.json`, "utf8"));
+    const server = config.networks?.httpServers?.find((item) => item.enabled !== false);
+    if (!server) throw new Error("HTTP server disabled");
+    const host = !server.host || server.host === "0.0.0.0" ? "127.0.0.1" : server.host;
+    const path = `${(server.path || "/").replace(/\/$/, "")}/get_status`;
+    const response = await fetch(`http://${host}:${server.port}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(server.accessToken ? { Authorization: `Bearer ${server.accessToken}` } : {}) },
+      body: "{}",
+      signal: AbortSignal.timeout(5000),
+    });
+    const payload = await response.json();
+    if (response.ok && payload.status === "ok" && payload.data?.online === true) process.stdout.write("online");
+    else if (response.ok && payload.data?.online === false) process.stdout.write("offline");
+    else process.stdout.write("api-error");
+  } catch { process.stdout.write("session-unavailable"); }
+})();
+NODE
+  )
+fi
+
+if ((machine)); then echo "$status"; exit 0; fi
+case "$status" in
+  online) echo 'QQ status: online' ;;
+  offline) echo 'QQ status: offline (logged out, disconnected, or kicked)' ;;
+  waiting-login) echo 'QQ status: waiting for login; run qqlogin' ;;
+  session-unavailable) echo 'QQ status: session unavailable (Hook or OneBot is not ready)' ;;
+  api-error) echo 'QQ status: OneBot API error' ;;
+  service-down) echo 'QQ status: QQ service is stopped' ;;
+  snowluma-down) echo 'QQ status: SnowLuma service is stopped' ;;
+  *) echo "QQ status: $status" ;;
+esac

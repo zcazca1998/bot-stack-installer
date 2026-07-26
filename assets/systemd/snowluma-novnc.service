@@ -1,0 +1,18 @@
+[Unit]
+Description=noVNC web client for the QQ display (127.0.0.1 only; front with a reverse proxy)
+After=network-online.target snowluma-vnc.service
+Wants=snowluma-vnc.service
+
+[Service]
+Type=simple
+User=snowluma
+Group=snowluma
+ExecStart=/usr/local/lib/bot-stack/novnc-web-launch
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
