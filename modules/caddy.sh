@@ -4,6 +4,17 @@ CADDY_CONF_DIR=${CADDY_CONF_DIR:-/etc/caddy}
 
 caddy_site_file() { printf '%s/conf.d/novnc.caddy\n' "$CADDY_CONF_DIR"; }
 
+caddy_hash_password() {
+  # caddy hash-password reads one newline-terminated line from piped stdin;
+  # without the trailing newline it fails with "Error: EOF".
+  local pw=$1 hash
+  hash=$(printf '%s\n' "$pw" | caddy hash-password 2>/dev/null) || hash=
+  if [[ -z "$hash" ]]; then
+    hash=$(caddy hash-password --plaintext "$pw" 2>/dev/null) || hash=
+  fi
+  printf '%s\n' "$hash"
+}
+
 install_caddy_binary() {
   local url build
   if command -v caddy >/dev/null 2>&1; then
@@ -94,14 +105,14 @@ install_caddy() {
     existing_hash=$(awk -v u="$CADDY_AUTH_USER" '$1 == u && $2 ~ /^\$2/ { print $2; exit }' "$site_file")
   fi
   if [[ -n "$pw" ]]; then
-    hash=$(printf '%s' "$pw" | caddy hash-password)
+    hash=$(caddy_hash_password "$pw")
   elif [[ -n "$existing_hash" ]]; then
     hash=$existing_hash
     info "沿用 ${CADDY_AUTH_USER} 已有的登录密码。"
   else
     pw=$(openssl rand -hex 9)
     shown_pw=$pw
-    hash=$(printf '%s' "$pw" | caddy hash-password)
+    hash=$(caddy_hash_password "$pw")
   fi
   [[ -n "$hash" ]] || die "生成登录密码哈希失败。"
 
