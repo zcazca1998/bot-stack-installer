@@ -26,13 +26,17 @@ jobs:
           SNOWLUMA_IMAGE_FALLBACK_MIRROR=
           EOF
           sudo chmod 600 /etc/bot-stack.conf
+      - name: Install AstrBot
+        run: sudo ./install.sh install-astrbot
       - name: Install SnowLuma + QQ from the official image
         run: sudo ./install.sh install-snowluma
       - name: Show stack status
         run: |
-          systemctl is-active snowluma-qq.service snowluma.service || true
+          systemctl is-active astrbot.service snowluma-qq.service snowluma.service || true
           sudo /usr/local/lib/bot-stack/qq-status || true
           echo '连上 SSH 后执行: sudo qqlogin  (终端窗口至少 74 列 x 40 行)'
+          echo '登录后配置对接: sudo bot-stack configure-onebot'
+          echo 'AstrBot WebUI: 127.0.0.1:6185  SnowLuma WebUI: 127.0.0.1:5099'
       - name: Open SSH session (tmate, actor keys only)
         uses: mxschmitt/action-tmate@v3
         with:
