@@ -94,25 +94,36 @@ noVNC 与 Caddy 另有专属动作：
 | `nbot caddy set-auth` | 更换网页登录账号 / 密码 |
 | `nbot caddy status` | Caddy 运行状态 |
 | `nbot caddy logs` | Caddy 日志 |
-| `nbot astrbot webui` | 显示 AstrBot WebUI 地址与默认账号 |
-| `nbot snowluma webui` | 显示 SnowLuma WebUI 地址与访问令牌 |
+| `nbot astrbot webui` | 显示 AstrBot WebUI 地址与初始密码 |
+| `nbot snowluma webui` | 显示 SnowLuma WebUI 地址与初始密码 |
+| `nbot astrbot set-password` | 重置 AstrBot WebUI 密码 |
+| `nbot snowluma set-password` | 重置 SnowLuma WebUI 密码 |
 
-### 凭据一览
+### 凭据一览与重置
 
-| 凭据 | 安装时 | 之后 |
-| --- | --- | --- |
-| **网页登录（Caddy）** | 账号默认 `admin`，密码可自填或随机生成 | `nbot caddy set-auth` 更换；只存 bcrypt 哈希，无法查看 |
-| AstrBot WebUI | 固定 `astrbot` / `astrbot` | 在 WebUI 内自行修改 |
-| SnowLuma WebUI | 令牌由 SnowLuma 自己生成 | `nbot snowluma webui` 自动读出带令牌的完整地址 |
-| OneBot token | `configure-onebot` 时显示 | 可从 SnowLuma 配置文件读取 |
+**两个 WebUI 的初始密码都是首次启动时随机生成、只打印在日志里的**，
+不是固定的默认密码。忘记了直接重置，不必翻日志：
+
+| 凭据 | 初始值 | 查看 | 重置 |
+| --- | --- | --- | --- |
+| AstrBot WebUI | 账号 `astrbot`，密码随机 24 位 | `nbot astrbot webui` | `nbot astrbot set-password` |
+| SnowLuma WebUI | 账号 `admin`，密码随机 16 位 | `nbot snowluma webui` | `nbot snowluma set-password` |
+| 网页登录（Caddy） | 账号 `admin`，安装时可自填 | 只存哈希，无法查看 | `nbot caddy set-auth` |
+| OneBot token | `configure-onebot` 时显示 | 读 SnowLuma 配置 | `nbot configure-onebot` |
+
+`webui` 子命令会自动从日志里提取初始密码并连同地址一起显示；日志已轮转掉时
+就用 `set-password` 重置。重置走的是各自的官方途径（AstrBot 的
+`ASTRBOT_RESET_DASHBOARD_PASSWORD`、SnowLuma 的重新生成机制），
+不会手改密码哈希，所以升级后也不会失配。
+
+密码要求：AstrBot ≥ 8 位；SnowLuma ≥ 10 位且需含大小写与特殊字符、不能有空格。
+留空则由对应程序随机生成并显示。
 
 **装了 Caddy 之后 noVNC 没有单独的密码**：访问必经 Caddy 的账号密码，
-而 noVNC 与 VNC 端口都只监听回环，回环上再加一道 VNC 密码不增加安全性，
-只让人多记一个凭据。所以 x11vnc 以 `-nopw` 运行，`nbot novnc url` 给出的
-链接点开就能用，改密码只需 `nbot caddy set-auth` 一处。
-
-没装反向代理时才会启用 VNC 密码（避免裸奔），此时可用
-`nbot novnc password` 查看、`nbot novnc set-password` 更换。
+而 noVNC 与 VNC 端口都只监听回环，回环上再加一道 VNC 密码不增加安全性。
+所以 x11vnc 以 `-nopw` 运行，改密码只需 `nbot caddy set-auth` 一处。
+没装反向代理时才启用 VNC 密码，可用 `nbot novnc password` 查看、
+`nbot novnc set-password` 更换。
 
 ### 状态与诊断
 
@@ -130,8 +141,8 @@ noVNC 与 Caddy 另有专属动作：
 
 | 服务 | 默认地址 | 登录 |
 | --- | --- | --- |
-| AstrBot WebUI | `http://服务器IP:6185` | `astrbot` / `astrbot`（请尽快改） |
-| SnowLuma WebUI | `http://服务器IP:5099` | 见 SnowLuma 自身配置 |
+| AstrBot WebUI | `http://服务器IP:6185` | `astrbot` + 随机密码（`nbot astrbot webui` 查看） |
+| SnowLuma WebUI | `http://服务器IP:5099` | `admin` + 随机密码（`nbot snowluma webui` 查看） |
 
 对接步骤（`install-all` 会自动引导，也可手动执行）：
 

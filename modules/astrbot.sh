@@ -105,6 +105,76 @@ install_astrbot() {
   trap - EXIT
 }
 
+astrbot_config_file() { printf '%s/data/cmd_config.json\n' "$ASTRBOT_ROOT"; }
+
+show_astrbot_webui() {
+  # v4.24.4 起首次启动随机生成 24 位密码并打印到日志，不再是 astrbot/astrbot。
+  local ip user password
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  ip=${ip:-服务器IP}
+  info "AstrBot WebUI: http://${ip}:${ASTRBOT_PORT}"
+  user=$(jq -r '.dashboard.username // "astrbot"' "$(astrbot_config_file)" 2>/dev/null || echo astrbot)
+  password=$(journalctl -u nbot-astrbot.service --no-pager 2>/dev/null |
+               grep -oP 'Initial password:\s*\K\S+' | tail -n1)
+  if [[ -n "$password" ]]; then
+    info "  账号 ${user}    初始密码 ${password}"
+    info "  （首次登录后请在 WebUI 内修改；忘记密码用 nbot astrbot set-password 重置）"
+  else
+    info "  账号 ${user}    密码：首次启动时随机生成并打印在日志中"
+    info "  查看：nbot astrbot logs | grep -i 'Initial password'"
+    info "  忘记了就重置：nbot astrbot set-password"
+  fi
+}
+
+set_astrbot_password() {
+  # 走 AstrBot 官方复位途径，不手改密码哈希：它同时维护 pbkdf2 与 legacy md5
+  # 两个字段，自己写格式在版本升级后极易失配，把用户彻底锁在外面。
+  local config password
+  config=$(astrbot_config_file)
+  [[ -f "$config" ]] || die "未找到 ${config}，请先安装并启动 AstrBot。"
+
+  if nbot_interactive; then
+    read -r -s -p '新的 AstrBot WebUI 密码（至少 8 位，留空则让 AstrBot 随机生成）: ' password; echo
+    if [[ -n "$password" ]]; then
+      local confirm_password
+      read -r -s -p '再输入一次确认: ' confirm_password; echo
+      [[ "$password" == "$confirm_password" ]] || die "两次输入不一致。"
+      ((${#password} >= 8)) || die "AstrBot 要求密码至少 8 位。"
+    fi
+  else
+    password=${NBOT_ASTRBOT_PASSWORD:-}
+  fi
+
+  systemctl stop nbot-astrbot.service 2>/dev/null || true
+  # 官方复位开关：清空两种密码字段并在下次启动时重新生成。
+  # ASTRBOT_RESET_DASHBOARD_PASSWORD 自 v4.24.4 起支持，被消费一次即失效。
+  install -d -m 0755 /etc/systemd/system/nbot-astrbot.service.d
+  {
+    printf '[Service]\n'
+    printf 'Environment=ASTRBOT_RESET_DASHBOARD_PASSWORD=1\n'
+    [[ -z "$password" ]] ||
+      printf 'Environment=ASTRBOT_DASHBOARD_INITIAL_PASSWORD=%s\n' "$password"
+  } > /etc/systemd/system/nbot-astrbot.service.d/reset-password.conf
+  systemctl daemon-reload
+  systemctl start nbot-astrbot.service
+
+  # 复位是一次性动作，用完立刻移除 drop-in，避免每次重启都重置密码。
+  sleep 8
+  rm -f /etc/systemd/system/nbot-astrbot.service.d/reset-password.conf
+  rmdir /etc/systemd/system/nbot-astrbot.service.d 2>/dev/null || true
+  systemctl daemon-reload
+
+  if ! systemctl is-active --quiet nbot-astrbot.service; then
+    journalctl -u nbot-astrbot.service -n 40 --no-pager
+    die "AstrBot 重启失败，密码可能未重置。"
+  fi
+  if [[ -n "$password" ]]; then
+    info "AstrBot WebUI 密码已设置为你输入的值。"
+  else
+    show_astrbot_webui
+  fi
+}
+
 install_astrbot_units() {
   install -d -m 0755 /usr/local/lib/nbot
   install -m 0755 "$SCRIPT_DIR/assets/bin/astrbot-prepare" /usr/local/lib/nbot/astrbot-prepare

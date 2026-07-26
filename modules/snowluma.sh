@@ -254,34 +254,92 @@ install_qq() {
   install_snowluma
 }
 
-snowluma_webui_token() {
-  # SnowLuma 自己生成 WebUI token，安装器不参与。优先读它的配置文件，
-  # 读不到再从日志里捞，避免用户自己去爬 journal。
-  local file token
-  for file in "$SNOWLUMA_ROOT"/data/config/webui.json \
-              "$SNOWLUMA_ROOT"/data/config/*webui*.json \
-              "$SNOWLUMA_ROOT"/config/webui.json; do
-    [[ -r "$file" ]] || continue
-    token=$(jq -r '.token // .accessToken // .password // empty' "$file" 2>/dev/null | head -n1)
-    [[ -n "$token" ]] && { printf '%s\n' "$token"; return 0; }
-  done
-  # 日志里通常打印过一次带 token 的访问地址。
-  token=$(journalctl -u nbot-snowluma.service --no-pager 2>/dev/null |
-            grep -oE 'token=[A-Za-z0-9._~-]+' | tail -n1 | cut -d= -f2)
-  [[ -n "$token" ]] && { printf '%s\n' "$token"; return 0; }
-  return 1
-}
+snowluma_webui_auth_file() { printf '%s/data/config/webui.json
+' "$SNOWLUMA_ROOT"; }
 
 show_snowluma_webui() {
-  local ip token
+  # SnowLuma 用密码登录（scrypt 哈希存 webui.json），没有 token；初始密码
+  # 只在首次启动时打印一次，日志里那行格式被第三方启动器解析，稳定可 grep。
+  local ip password
   ip=$(hostname -I 2>/dev/null | awk '{print $1}')
   ip=${ip:-服务器IP}
-  if token=$(snowluma_webui_token); then
-    info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}/?token=${token}"
-    info "  访问令牌：${token}（nbot snowluma webui 可再次查看）"
+  info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}"
+  password=$(journalctl -u nbot-snowluma.service --no-pager 2>/dev/null |
+               grep -oP 'initial credentials: user=admin password=\K\S+' | tail -n1)
+  if [[ -n "$password" ]]; then
+    info "  账号 admin    初始密码 ${password}"
+    info "  （首次登录后必须改密；忘记密码用 nbot snowluma set-password 重置）"
   else
-    info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}"
-    warn "未能自动读取 SnowLuma 访问令牌，可执行：nbot snowluma logs -n 200 | grep -i token"
+    info "  账号 admin    密码：首次启动时随机生成并打印在日志中"
+    info "  查看：nbot snowluma logs | grep -i 'initial credentials'"
+    info "  忘记了就重置：nbot snowluma set-password"
+  fi
+}
+
+set_snowluma_password() {
+  # SnowLuma 的密码是 scrypt 哈希（N=16384,r=8,p=1,keylen=64），无法手工构造，
+  # 官方复位途径是删除 webui.json 让它重新生成；能指定密码的
+  # SNOWLUMA_WEBUI_BOOTSTRAP_PASSWORD 也只在该文件不存在时生效。
+  local auth_file password backup
+  auth_file=$(snowluma_webui_auth_file)
+  [[ -f /etc/systemd/system/nbot-snowluma.service ]] ||
+    die "尚未安装 SnowLuma，请先执行 nbot install-snowluma。"
+
+  if nbot_interactive; then
+    info "SnowLuma 密码要求：至少 10 位，含大小写字母与特殊字符，不能有空格。"
+    read -r -s -p '新的 SnowLuma WebUI 密码（留空则由 SnowLuma 随机生成）: ' password; echo
+    if [[ -n "$password" ]]; then
+      local confirm_password
+      read -r -s -p '再输入一次确认: ' confirm_password; echo
+      [[ "$password" == "$confirm_password" ]] || die "两次输入不一致。"
+      ((${#password} >= 10)) || die "SnowLuma 要求密码至少 10 位。"
+      [[ "$password" =~ [a-z] && "$password" =~ [A-Z] && "$password" =~ [^A-Za-z0-9] ]] ||
+        die "密码需同时包含小写、大写字母与特殊字符。"
+      [[ ! "$password" =~ [[:space:]] ]] || die "密码不能包含空格。"
+    fi
+  else
+    password=${NBOT_SNOWLUMA_PASSWORD:-}
+  fi
+
+  systemctl stop nbot-snowluma.service 2>/dev/null || true
+  if [[ -f "$auth_file" ]]; then
+    backup="${auth_file}.bak.$(date +%s)"
+    mv -f "$auth_file" "$backup"
+    info "原凭据已备份：${backup}"
+  fi
+
+  if [[ -n "$password" ]]; then
+    # 该环境变量自 v1.8.2 起支持；旧版本会忽略并退回随机生成。
+    install -d -m 0755 /etc/systemd/system/nbot-snowluma.service.d
+    printf '[Service]
+Environment=SNOWLUMA_WEBUI_BOOTSTRAP_PASSWORD=%s
+' "$password"       > /etc/systemd/system/nbot-snowluma.service.d/bootstrap-password.conf
+    chmod 0600 /etc/systemd/system/nbot-snowluma.service.d/bootstrap-password.conf
+    systemctl daemon-reload
+  fi
+
+  systemctl start nbot-snowluma.service
+  sleep 8
+  # 指定密码只在首次生成时被读取，用完即清，避免长期把明文留在 unit 里。
+  if [[ -n "$password" ]]; then
+    rm -f /etc/systemd/system/nbot-snowluma.service.d/bootstrap-password.conf
+    rmdir /etc/systemd/system/nbot-snowluma.service.d 2>/dev/null || true
+    systemctl daemon-reload
+  fi
+
+  if ! systemctl is-active --quiet nbot-snowluma.service; then
+    journalctl -u nbot-snowluma.service -n 40 --no-pager
+    die "SnowLuma 重启失败，密码可能未重置。"
+  fi
+  if [[ -n "$password" ]]; then
+    if [[ -s "$auth_file" ]]; then
+      info "SnowLuma WebUI 密码已设置为你输入的值（账号 admin）。"
+    else
+      warn "未生成凭据文件，当前 SnowLuma 版本可能不支持指定初始密码。"
+      show_snowluma_webui
+    fi
+  else
+    show_snowluma_webui
   fi
 }
 

@@ -148,6 +148,17 @@ doctor() {
     warn "noVNC 在运行但 ${NOVNC_PORT} 无响应。"
     failed=1
   fi
+
+  # 忘记密码是最常见的求助场景，把出路直接写在诊断输出里。
+  bold "忘记密码怎么办"
+  info "AstrBot WebUI:  nbot astrbot set-password"
+  info "SnowLuma WebUI: nbot snowluma set-password"
+  [[ ! -f /etc/systemd/system/caddy.service ]] ||
+    info "网页登录（Caddy）: nbot caddy set-auth"
+  if [[ -f /etc/systemd/system/nbot-vnc.service ]] && ! novnc_fronted_by_caddy; then
+    info "VNC 密码:       nbot novnc set-password"
+  fi
+  info "OneBot token:   nbot configure-onebot（重新生成并显示）"
   return "$failed"
 }
 
@@ -156,7 +167,7 @@ print_summary() {
   ip=$(hostname -I 2>/dev/null | awk '{print $1}')
   ip=${ip:-服务器IP}
   bold "安装完成"
-  info "AstrBot WebUI:  http://${ip}:${ASTRBOT_PORT}（默认账号/密码 astrbot/astrbot，请尽快修改）"
+  show_astrbot_webui
   show_snowluma_webui
   info "下一步："
   info "  1) nbot login                  # 扫码登录 QQ"
@@ -292,16 +303,17 @@ service_command() {
       [[ "$group" == novnc ]] || die "仅 novnc 支持 password"
       cat "$(vnc_password_file)" ;;
     set-password)
-      [[ "$group" == novnc ]] || die "仅 novnc 支持 set-password"
-      set_vnc_password ;;
+      case "$group" in
+        astrbot) set_astrbot_password ;;
+        snowluma) set_snowluma_password ;;
+        novnc) set_vnc_password ;;
+        *) die "$group 不支持密码重置" ;;
+      esac ;;
     webui)
       case "$group" in
         snowluma) show_snowluma_webui ;;
         novnc) show_novnc_access ;;
-        astrbot)
-          local ip
-          ip=$(hostname -I 2>/dev/null | awk '{print $1}')
-          info "AstrBot WebUI: http://${ip:-服务器IP}:${ASTRBOT_PORT}（astrbot / astrbot）" ;;
+        astrbot) show_astrbot_webui ;;
         *) die "$group 没有 WebUI" ;;
       esac ;;
     url)
@@ -350,6 +362,7 @@ QQ 登录
       nbot qq restart               重启 QQ（先停 SnowLuma 避免 Hook 悬空）
       nbot snowluma update          重新拆镜像更新 SnowLuma + QQ
   WebUI 地址：nbot astrbot webui | snowluma webui | novnc url
+  重置密码：  nbot astrbot set-password | snowluma set-password | caddy set-auth
   noVNC 专属：nbot novnc url | password | set-password | proxy-example
   Caddy：     nbot caddy set-auth | status | restart | logs
 

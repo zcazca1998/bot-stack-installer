@@ -213,8 +213,16 @@ grep -q 'autoconnect=1' "$ROOT/modules/novnc.sh"
 grep -q 'nopw' "$ROOT/assets/bin/vnc-server-launch"
 grep -q 'novnc_fronted_by_caddy()' "$ROOT/modules/novnc.sh"
 grep -q 'show_novnc_access' "$ROOT/modules/caddy.sh"
-grep -q 'snowluma_webui_token()' "$ROOT/modules/snowluma.sh"
 grep -q 'show_snowluma_webui' "$ROOT/install-core.sh"
+# Both WebUIs generate a random password on first start; never claim a fixed
+# default and always offer an official reset path instead of editing hashes.
+! grep -rq 'astrbot/astrbot' "$ROOT/README.md" "$ROOT/install-core.sh" "$ROOT/modules"
+grep -q 'set_astrbot_password()' "$ROOT/modules/astrbot.sh"
+grep -q 'ASTRBOT_RESET_DASHBOARD_PASSWORD' "$ROOT/modules/astrbot.sh"
+grep -q 'set_snowluma_password()' "$ROOT/modules/snowluma.sh"
+grep -q 'SNOWLUMA_WEBUI_BOOTSTRAP_PASSWORD' "$ROOT/modules/snowluma.sh"
+grep -q 'show_astrbot_webui()' "$ROOT/modules/astrbot.sh"
+grep -q 'set-password)' "$ROOT/install-core.sh"
 grep -q 'reverse_proxy 127.0.0.1' "$ROOT/modules/caddy.sh"
 # IP access sends no SNI; an explicit self-signed cert must be used.
 grep -q 'novnc-selfsigned' "$ROOT/modules/caddy.sh"
