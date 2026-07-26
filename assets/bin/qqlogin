@@ -24,6 +24,26 @@ done
 cgroup=/sys/fs/cgroup/system.slice/snowluma-qq.service/cgroup.procs
 login_file="$SNOWLUMA_ROOT/config/QQ/auth/login.enc"
 
+display= auth=
+resolve_display() {
+  # 每次重新解析：QQ 每次重启后 Xvfb 的 PID 和 X cookie 都会变，
+  # 只有 DISPLAY 号和 Xauthority 路径稳定。
+  display= auth=
+  [[ -r "$cgroup" ]] || return 1
+  local pid xvfb_pid= args i
+  while read -r pid; do
+    [[ -r "/proc/$pid/comm" ]] || continue
+    [[ $(<"/proc/$pid/comm") == Xvfb ]] && { xvfb_pid=$pid; break; }
+  done < "$cgroup"
+  [[ -n "$xvfb_pid" ]] || return 1
+  mapfile -d '' -t args < "/proc/$xvfb_pid/cmdline"
+  for ((i=0; i<${#args[@]}; i++)); do
+    [[ ${args[$i]} =~ ^:[0-9]+$ ]] && display=${args[$i]}
+    [[ ${args[$i]} == -auth ]] && auth=${args[$((i+1))]:-}
+  done
+  [[ -n "$display" && -r "$auth" ]]
+}
+
 restart_qq() {
   # clear_state=1: also back up login.enc so QQ boots straight into the QR
   # page instead of an expired quick-login list or an "expired" dialog.
@@ -37,7 +57,18 @@ restart_qq() {
   systemctl start snowluma-qq.service ||
     { echo 'snowluma-qq.service 启动失败，请查看 snowlumactl logs' >&2; exit 1; }
   systemctl --no-block start snowluma.service 2>/dev/null || true
-  sleep 5
+  # 等新的 Xvfb 与 QQ 窗口就绪：旧显示连接此刻已失效，过早截屏会让
+  # X 工具带 SIGABRT 退出并刷屏。
+  local waited=0
+  display= auth=
+  while ((waited < 60)); do
+    if resolve_display 2>/dev/null &&
+       DISPLAY="$display" XAUTHORITY="$auth" xdotool search --onlyvisible --name '^QQ$' >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
 }
 
 service_state=$(systemctl is-active snowluma-qq.service 2>/dev/null || true)
@@ -71,26 +102,6 @@ tmp=$(mktemp /dev/shm/qqlogin.XXXXXX.png)
 cleanup() { rm -f "$tmp"; printf '\033[0m\033[?25h'; }
 trap cleanup EXIT
 trap 'exit 130' HUP INT TERM
-
-display= auth=
-resolve_display() {
-  # Re-resolve every capture: PIDs and the X cookie change on every QQ
-  # restart, only the paths stay stable.
-  display= auth=
-  [[ -r "$cgroup" ]] || return 1
-  local pid xvfb_pid= args i
-  while read -r pid; do
-    [[ -r "/proc/$pid/comm" ]] || continue
-    [[ $(<"/proc/$pid/comm") == Xvfb ]] && { xvfb_pid=$pid; break; }
-  done < "$cgroup"
-  [[ -n "$xvfb_pid" ]] || return 1
-  mapfile -d '' -t args < "/proc/$xvfb_pid/cmdline"
-  for ((i=0; i<${#args[@]}; i++)); do
-    [[ ${args[$i]} =~ ^:[0-9]+$ ]] && display=${args[$i]}
-    [[ ${args[$i]} == -auth ]] && auth=${args[$((i+1))]:-}
-  done
-  [[ -n "$display" && -r "$auth" ]]
-}
 
 main_window_visible() {
   # 登录成功后 320x460 登录小窗会关闭、出现宽度更大的主窗口。login.enc 的
