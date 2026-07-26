@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source /etc/bot-stack.conf
+: "${SNOWLUMA_ROOT:=/bot-stack/snowluma}" "${SNOWLUMA_PAYLOAD_ROOT:=/bot-stack/payload/snowluma}" "${SNOWLUMA_WEBUI_PORT:=5099}"
 export HOME="$SNOWLUMA_ROOT/home"
 export XDG_CONFIG_HOME="$SNOWLUMA_ROOT/config"
 export XDG_CACHE_HOME="$SNOWLUMA_ROOT/cache"

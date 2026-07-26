@@ -4,7 +4,7 @@ if [[ -r /etc/bot-stack.conf ]]; then
   source /etc/bot-stack.conf
 fi
 NOVNC_PORT=${NOVNC_PORT:-6080}
-SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-/snowluma}
+SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-/bot-stack/snowluma}
 command=${1:-status}
 case "$command" in
   start) systemctl start snowluma-vnc.service snowluma-novnc.service ;;

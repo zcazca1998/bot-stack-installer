@@ -62,12 +62,19 @@ grep -q 'show_help()' "$ROOT/install-core.sh"
 grep -q 'rm -f /etc/logrotate.d/bot-stack' "$ROOT/install-core.sh"
 grep -q 'journald.conf.d/bot-stack.conf' "$ROOT/install-core.sh"
 
+# Runtime scripts must survive a partial config file under set -u, and the
+# entry point must normalize partial configs into a complete one.
+grep -q 'ASTRBOT_PORT:=' "$ROOT/assets/bin/astrbot-prepare"
+grep -q 'SNOWLUMA_WEBUI_PORT:=' "$ROOT/assets/bin/snowluma-launch"
+grep -q '^write_config$' "$ROOT/install.sh"
+
 # install-all must offer QR login; bot-stack qqlogin must pass through.
 grep -q '现在就扫码登录 QQ' "$ROOT/install-core.sh"
 grep -q 'qqlogin) exec /usr/local/bin/qqlogin' "$ROOT/install-core.sh"
-# Every helper script must carry the executable bit in git.
+# Every helper script must carry the executable bit in git (JS files are
+# invoked via node and are exempt).
 if [[ "$(uname -s)" == Linux ]]; then
-  unexec=$(find "$ROOT/assets/bin" "$ROOT/tests" -type f ! -perm -u+x || true)
+  unexec=$( { find "$ROOT/assets/bin" -type f ! -name '*.js' ! -name 'write-onebot-config' ! -perm -u+x; find "$ROOT/tests" -name '*.sh' -type f ! -perm -u+x; } || true)
   [[ -z "$unexec" ]] || { echo "Missing exec bit: $unexec" >&2; exit 1; }
 fi
 grep -q 'python-build-standalone' "$ROOT/modules/astrbot.sh"

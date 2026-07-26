@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source /etc/bot-stack.conf
+: "${ASTRBOT_PORT:=6185}"
 failures=/run/astrbot-watchdog.failures
 grace=/run/astrbot-watchdog.grace
 

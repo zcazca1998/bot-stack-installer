@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source /etc/bot-stack.conf
+: "${SNOWLUMA_ROOT:=/bot-stack/snowluma}" "${SNOWLUMA_PAYLOAD_ROOT:=/bot-stack/payload/snowluma}"
 machine=0
 [[ ${1:-} == --machine ]] && machine=1
 

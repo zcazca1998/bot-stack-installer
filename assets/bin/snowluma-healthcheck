@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source /etc/bot-stack.conf
+: "${SNOWLUMA_ROOT:=/bot-stack/snowluma}" "${SNOWLUMA_WEBUI_PORT:=5099}"
 web_fail=/run/snowluma-watchdog.web-failures
 hook_fail=/run/snowluma-watchdog.hook-failures
 qq_fail=/run/snowluma-watchdog.qq-failures

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source /etc/bot-stack.conf
+: "${SNOWLUMA_ROOT:=/bot-stack/snowluma}"
 release=$(readlink -f "$SNOWLUMA_ROOT/qq/current")
 [[ -r "$release/.qq-executable" ]] || { echo "QQ executable metadata is missing" >&2; exit 3; }
 relative=$(<"$release/.qq-executable")

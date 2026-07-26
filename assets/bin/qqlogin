@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source /etc/bot-stack.conf
-SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-/snowluma}
+SNOWLUMA_ROOT=${SNOWLUMA_ROOT:-/bot-stack/snowluma}
 
 usage() {
   echo '用法: qqlogin [--fresh]'
