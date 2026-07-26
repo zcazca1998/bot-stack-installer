@@ -1,3 +1,5 @@
+## **本项目代码 100% 由 AI 编写，人类负责需求、设计决策与验收。**
+
 # nbot
 
 [![CI](https://github.com/zcazca1998/nbot/actions/workflows/ci.yml/badge.svg)](https://github.com/zcazca1998/nbot/actions/workflows/ci.yml)
