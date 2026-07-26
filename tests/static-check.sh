@@ -212,6 +212,10 @@ grep -q 'autoconnect=1' "$ROOT/modules/novnc.sh"
 # user never juggles a second password for a loopback-only port.
 grep -q 'nopw' "$ROOT/assets/bin/vnc-server-launch"
 grep -q 'novnc_fronted_by_caddy()' "$ROOT/modules/novnc.sh"
+# The bridge decides at startup whether a VNC password is needed, and it starts
+# before Caddy: installing Caddy must restart it or the stale decision sticks.
+grep -q 'systemctl restart nbot-vnc.service' "$ROOT/modules/caddy.sh"
+grep -q 'After=nbot-qq.service caddy.service' "$ROOT/assets/systemd/nbot-vnc.service"
 grep -q 'show_novnc_access' "$ROOT/modules/caddy.sh"
 grep -q 'show_snowluma_webui' "$ROOT/install-core.sh"
 # Both WebUIs generate a random password on first start; never claim a fixed

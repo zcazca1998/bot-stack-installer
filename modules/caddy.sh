@@ -192,6 +192,11 @@ install_caddy() {
 
   systemctl enable caddy.service >/dev/null
   systemctl restart caddy.service
+  # VNC 桥接在启动时决定是否启用 VNC 密码；它先于 Caddy 启动，所以必须在
+  # 这里重启一次，否则会一直沿用「无反代」时的 -passwdfile 判断。
+  if systemctl is-active --quiet nbot-vnc.service; then
+    systemctl restart nbot-vnc.service
+  fi
   sleep 2
   if ! systemctl is-active --quiet caddy.service; then
     journalctl -u caddy.service -n 40 --no-pager

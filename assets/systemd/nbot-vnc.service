@@ -1,6 +1,8 @@
 [Unit]
 Description=x11vnc bridge for the QQ Xvfb display (127.0.0.1 only)
-After=nbot-qq.service
+# Caddy 决定是否需要 VNC 密码那一层，所以让它先就绪再启动桥接，避免拿到
+# 过时的判断结果。Caddy 未安装时该依赖被忽略。
+After=nbot-qq.service caddy.service
 PartOf=nbot-qq.service
 
 [Service]
