@@ -22,7 +22,8 @@ import os
 from pathlib import Path
 
 path = Path(os.environ["CONFIG_PATH"])
-config = json.loads(path.read_text(encoding="utf-8"))
+# astrbot.cli init writes the config with a UTF-8 BOM; utf-8-sig reads both.
+config = json.loads(path.read_text(encoding="utf-8-sig"))
 dashboard = config.setdefault("dashboard", {})
 port = int(os.environ["DASHBOARD_PORT"])
 if dashboard.get("port") != port:
