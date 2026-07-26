@@ -4,6 +4,28 @@ CADDY_CONF_DIR=${CADDY_CONF_DIR:-/etc/caddy}
 
 caddy_site_file() { printf '%s/conf.d/novnc.caddy\n' "$CADDY_CONF_DIR"; }
 
+caddy_self_cert() { printf '%s/novnc-selfsigned.crt\n' "$CADDY_CONF_DIR"; }
+caddy_self_key() { printf '%s/novnc-selfsigned.key\n' "$CADDY_CONF_DIR"; }
+
+ensure_selfsigned_cert() {
+  # IP access sends no SNI, and Caddy's on-demand internal issuer cannot
+  # match a certificate then; an explicitly configured single cert is always
+  # served regardless of SNI.
+  local crt key
+  crt=$(caddy_self_cert)
+  key=$(caddy_self_key)
+  [[ -s "$crt" && -s "$key" ]] && return 0
+  install -d -m 0755 "$CADDY_CONF_DIR"
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+    -keyout "$key" -out "$crt" \
+    -subj "/CN=bot-stack-novnc" \
+    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" 2>/dev/null || true
+  [[ -s "$crt" && -s "$key" ]] || die "自签名证书生成失败（openssl req 报错）。"
+  chmod 0644 "$crt"
+  chmod 0640 "$key"
+  chown root:caddy "$key" 2>/dev/null || true
+}
+
 caddy_hash_password() {
   # caddy hash-password reads one newline-terminated line from piped stdin;
   # without the trailing newline it fails with "Error: EOF".
@@ -95,7 +117,8 @@ install_caddy() {
   else
     prompt_port CADDY_HTTPS_PORT "自签名 HTTPS 端口" "$CADDY_HTTPS_PORT"
     site=":${CADDY_HTTPS_PORT}"
-    tls_line=$'    tls internal\n'
+    ensure_selfsigned_cert
+    tls_line="    tls $(caddy_self_cert) $(caddy_self_key)"$'\n'
   fi
   prompt_default CADDY_AUTH_USER "网页登录账号" "$CADDY_AUTH_USER"
   read -r -s -p '网页登录密码（留空 = 沿用旧密码，无旧密码则自动生成）: ' pw; echo

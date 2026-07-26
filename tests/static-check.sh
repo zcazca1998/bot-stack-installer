@@ -78,5 +78,6 @@ grep -q '^Restart=on-abnormal$' "$ROOT/assets/systemd/caddy.service"
 grep -q 'caddy validate' "$ROOT/modules/caddy.sh"
 grep -q 'basic_auth /novnc/\*' "$ROOT/modules/caddy.sh"
 grep -q 'reverse_proxy 127.0.0.1' "$ROOT/modules/caddy.sh"
-grep -q 'tls internal' "$ROOT/modules/caddy.sh"
+# IP access sends no SNI; an explicit self-signed cert must be used.
+grep -q 'novnc-selfsigned' "$ROOT/modules/caddy.sh"
 echo 'Static checks passed.'

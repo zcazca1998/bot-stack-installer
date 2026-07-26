@@ -68,7 +68,7 @@ sudo ./install.sh install-caddy
 ~~~
 
 - Caddy 二进制从 GitHub Release 下载（走 GITHUB_ACCESS 的代理/直连回退），amd64/arm64 自动匹配；系统里已有 apt 安装的 Caddy 时不重复安装、不覆盖发行版 unit。
-- 两种模式：填域名 → 自动申请 HTTPS 证书（需 80/443 对外可达）；留空 → `tls internal` 自签名 + 自定义端口（默认 8443），纯 IP 也能用。
+- 两种模式：填域名 → 自动申请 HTTPS 证书（需 80/443 对外可达）；留空 → 本地生成自签名证书 + 自定义端口（默认 8443），纯 IP 访问也能用（IP 连接不带 SNI，显式证书不受影响）。
 - 自动生成 basic_auth 登录（账号默认 admin，密码可自填或随机生成，bcrypt 哈希存入配置）。
 - 站点配置独立在 /etc/caddy/conf.d/novnc.caddy；已有 Caddyfile 只追加一行 import 并自动备份，不覆盖原配置。
 - 启动前 `caddy validate` 校验；自签名模式还会自测「未认证 401 / 带凭据 200」。
