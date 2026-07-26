@@ -2,7 +2,7 @@
 
 # nbot
 
-[![CI](https://github.com/zcazca1998/nbot/actions/workflows/ci.yml/badge.svg)](https://github.com/zcazca1998/nbot/actions/workflows/ci.yml)
+[![CI](https://github.com/zcazca1998/nbot-linux/actions/workflows/ci.yml/badge.svg)](https://github.com/zcazca1998/nbot-linux/actions/workflows/ci.yml)
 
 Debian / Ubuntu / Armbian 上的 **AstrBot + SnowLuma + Linux QQ** 一键部署器。
 自动识别 amd64 与 arm64，不安装 Docker，全部服务由原生 systemd 管理。
@@ -16,13 +16,13 @@ Debian / Ubuntu / Armbian 上的 **AstrBot + SnowLuma + Linux QQ** 一键部署�
 **国内机器**（脚本本身也走加速站）：
 
 ~~~bash
-curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/zcazca1998/nbot-linux/main/bootstrap.sh | sudo bash
 ~~~
 
 **海外机器**（直连）：
 
 ~~~bash
-curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot-linux/main/bootstrap.sh | sudo bash
 ~~~
 
 一条命令走完：探测网络环境 → 选择镜像 → 装 AstrBot → 拆 SnowLuma+QQ 镜像 →
@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh |
 手动克隆也可以：
 
 ~~~bash
-git clone https://github.com/zcazca1998/nbot.git
+git clone https://github.com/zcazca1998/nbot-linux.git
 cd nbot && sudo ./install.sh
 ~~~
 

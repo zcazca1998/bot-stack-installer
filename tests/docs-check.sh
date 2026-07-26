@@ -56,7 +56,7 @@ for cmd in install-all install-astrbot install-snowluma install-novnc \
 done
 
 # 一键安装命令必须指向真实仓库，且国内版带加速前缀。
-grep -q 'raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh' "$ROOT/README.md"
+grep -q 'raw.githubusercontent.com/zcazca1998/nbot-linux/main/bootstrap.sh' "$ROOT/README.md"
 grep -q 'gh-proxy.com/https://raw.githubusercontent.com' "$ROOT/README.md"
 
 echo 'Docs consistency checks passed.'
