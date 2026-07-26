@@ -204,7 +204,8 @@ jobs:
           after=$(sudo sha256sum "$auth" 2>/dev/null | awk '{print $1}' || echo none)
           echo "auth hash: $before -> $after"
           [ "$before" != "$after" ]
-          ls /mnt/nbot/snowluma/data/config/webui.json.bak.* >/dev/null
+          # 配置目录是 0700 且属主为 snowluma，列目录必须用 sudo。
+          sudo sh -c 'ls /mnt/nbot/snowluma/data/config/webui.json.bak.*' >/dev/null
           for _ in $(seq 1 30); do
             curl -fsS -o /dev/null http://127.0.0.1:5099/ && break
             sleep 2
