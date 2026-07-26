@@ -31,6 +31,7 @@ EOF
 
 configure_base() {
   local previous_home=$NBOT_HOME
+  detect_network_region
   bold "基础配置（回车保留默认值，输入 - 可清空该项）"
   prompt_default NBOT_HOME "统一工作区目录（各组件按名字放子目录）" "$NBOT_HOME"
   if [[ "$NBOT_HOME" != "$previous_home" ]]; then
@@ -46,12 +47,12 @@ configure_base() {
   prompt_port SNOWLUMA_WEBUI_PORT "SnowLuma WebUI 端口" "$SNOWLUMA_WEBUI_PORT"
   prompt_port ONEBOT_HTTP_PORT "SnowLuma OneBot HTTP 端口" "$ONEBOT_HTTP_PORT"
 
+  bold "网络与加速（国内机器建议保持镜像默认值）"
   while :; do
-    prompt_default GITHUB_ACCESS "GitHub 访问方式：auto=代理失败转直连 / proxy=仅代理 / direct=仅直连" "$GITHUB_ACCESS"
+    prompt_default GITHUB_ACCESS "GitHub 访问方式：auto=代理->加速站->直连 / proxy=仅代理 / direct=不用代理" "$GITHUB_ACCESS"
     case "$GITHUB_ACCESS" in
       auto|proxy)
-        prompt_default GITHUB_PROXY "GitHub 代理地址" \
-          "${GITHUB_PROXY:-socks5h://127.0.0.1:20170}"
+        prompt_default GITHUB_PROXY "GitHub 代理地址（无代理请输入 - 清空）"           "${GITHUB_PROXY:-socks5h://127.0.0.1:20170}"
         if [[ "$GITHUB_ACCESS" == proxy && -z "$GITHUB_PROXY" ]]; then
           warn "proxy 模式必须填写代理地址。"
           continue
@@ -63,17 +64,17 @@ configure_base() {
     esac
   done
 
-  prompt_default SNOWLUMA_IMAGE "SnowLuma 镜像" "$SNOWLUMA_IMAGE"
-  prompt_default SNOWLUMA_IMAGE_MIRROR "容器镜像加速前缀（输入 - 清空表示仅直连）" "$SNOWLUMA_IMAGE_MIRROR"
-  prompt_default SNOWLUMA_IMAGE_FALLBACK_MIRROR "备用镜像加速前缀（输入 - 清空）" "$SNOWLUMA_IMAGE_FALLBACK_MIRROR"
-  prompt_default SNOWLUMA_IMAGE_PROXY "镜像下载代理（可选，输入 - 清空）" "${SNOWLUMA_IMAGE_PROXY:-$GITHUB_PROXY}"
-  prompt_default GITHUB_MIRRORS "GitHub 下载加速站（逗号分隔，按序尝试；输入 - 清空表示不用加速）" "$GITHUB_MIRRORS"
-  prompt_default PIP_INDEX_URL "pip 索引地址（国内建议保留镜像；输入 - 用官方 PyPI）" "$PIP_INDEX_URL"
+  pick_option GITHUB_MIRRORS "GitHub 下载加速" "$GITHUB_MIRRORS" GITHUB_MIRROR_CHOICES
+  pick_option PIP_INDEX_URL "PyPI 镜像（AstrBot 依赖数百 MB，国内直连基本装不动）"     "$PIP_INDEX_URL" PIP_MIRROR_CHOICES
   if [[ -n "$PIP_INDEX_URL" ]]; then
-    prompt_default PIP_TRUSTED_HOST "pip trusted-host（一般与索引域名一致）" "$PIP_TRUSTED_HOST"
+    PIP_TRUSTED_HOST=$(host_of_url "$PIP_INDEX_URL")
   else
     PIP_TRUSTED_HOST=
   fi
+  pick_option SNOWLUMA_IMAGE_MIRROR "容器镜像加速（首选）"     "$SNOWLUMA_IMAGE_MIRROR" IMAGE_MIRROR_CHOICES
+  pick_option SNOWLUMA_IMAGE_FALLBACK_MIRROR "容器镜像加速（备用）"     "$SNOWLUMA_IMAGE_FALLBACK_MIRROR" IMAGE_MIRROR_CHOICES
+  prompt_default SNOWLUMA_IMAGE "SnowLuma 镜像" "$SNOWLUMA_IMAGE"
+  prompt_default SNOWLUMA_IMAGE_PROXY "镜像下载代理（可选，输入 - 清空）" "${SNOWLUMA_IMAGE_PROXY:-$GITHUB_PROXY}"
   prompt_default JOURNALD_MAX_USE "journald 系统日志总量上限（如 500M；输入 - 表示不修改系统默认）" "${JOURNALD_MAX_USE:-500M}"
 
   write_config

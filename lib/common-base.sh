@@ -16,10 +16,36 @@ GITHUB_PROXY=${GITHUB_PROXY:-}
 GITHUB_ACCESS=${GITHUB_ACCESS:-auto}
 # GitHub 下载加速前缀（国内直连常年不通）。按顺序尝试，全部失败后直连。
 # 留空表示不使用加速镜像。
-GITHUB_MIRRORS=${GITHUB_MIRRORS:-https://ghfast.top,https://gh-proxy.com,https://ghproxy.net}
+GITHUB_MIRRORS=${GITHUB_MIRRORS:-https://gh-proxy.com,https://ghfast.top,https://ghproxy.net}
 # pip 索引（AstrBot 依赖数百 MB，国内直连 PyPI 基本不可用）。
-PIP_INDEX_URL=${PIP_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple/}
-PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-mirrors.aliyun.com}
+PIP_INDEX_URL=${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-pypi.tuna.tsinghua.edu.cn}
+# 网络地区：auto 首次运行时探测，cn=国内（默认用镜像），global=海外（默认直连）。
+NETWORK_REGION=${NETWORK_REGION:-auto}
+
+# 候选镜像：编号 | 显示名 | 值（第二字段用于 trusted-host 推导）
+PIP_MIRROR_CHOICES=(
+  "清华 TUNA|https://pypi.tuna.tsinghua.edu.cn/simple"
+  "阿里云|https://mirrors.aliyun.com/pypi/simple/"
+  "腾讯云|https://mirrors.cloud.tencent.com/pypi/simple"
+  "中科大 USTC|https://mirrors.ustc.edu.cn/pypi/simple"
+  "华为云|https://repo.huaweicloud.com/repository/pypi/simple"
+  "官方 pypi.org|https://pypi.org/simple"
+)
+GITHUB_MIRROR_CHOICES=(
+  "gh-proxy.com|https://gh-proxy.com"
+  "ghfast.top|https://ghfast.top"
+  "ghproxy.net|https://ghproxy.net"
+  "全部依次尝试|https://gh-proxy.com,https://ghfast.top,https://ghproxy.net"
+  "不使用加速（直连）|"
+)
+IMAGE_MIRROR_CHOICES=(
+  "dockerproxy.net|dockerproxy.net"
+  "docker.1ms.run|docker.1ms.run"
+  "m.daocloud.io/docker.io|m.daocloud.io/docker.io"
+  "docker.xuanyuan.me|docker.xuanyuan.me"
+  "不使用加速（直连 Docker Hub）|"
+)
 SNOWLUMA_IMAGE=${SNOWLUMA_IMAGE:-motricseven7/snowluma:latest}
 SNOWLUMA_IMAGE_MIRROR=${SNOWLUMA_IMAGE_MIRROR:-dockerproxy.net}
 SNOWLUMA_IMAGE_FALLBACK_MIRROR=${SNOWLUMA_IMAGE_FALLBACK_MIRROR:-docker.1ms.run}
@@ -213,6 +239,70 @@ git_args() {
   [[ "$GITHUB_ACCESS" != direct && -n "$GITHUB_PROXY" ]] && GIT_ARGS=(-c "http.proxy=$GITHUB_PROXY" -c "https.proxy=$GITHUB_PROXY")
 }
 
+detect_network_region() {
+  # 用实测连通性判断，而不是猜时区：能快速直连 GitHub 就按海外处理。
+  # 结果写回配置，后续运行不再重复探测。
+  [[ "$NETWORK_REGION" == auto ]] || return 0
+  info "正在探测网络环境（约需 10 秒）..."
+  if curl -fsS --max-time 6 -o /dev/null https://api.github.com/ 2>/dev/null &&
+     curl -fsS --max-time 6 -o /dev/null https://pypi.org/simple/ 2>/dev/null; then
+    NETWORK_REGION=global
+    info "检测到可直连 GitHub 与 PyPI，按海外网络配置（默认直连，不用镜像）。"
+    GITHUB_MIRRORS=
+    PIP_INDEX_URL=
+    PIP_TRUSTED_HOST=
+    SNOWLUMA_IMAGE_MIRROR=
+    SNOWLUMA_IMAGE_FALLBACK_MIRROR=
+  else
+    NETWORK_REGION=cn
+    info "直连 GitHub/PyPI 不通，按国内网络配置（默认启用镜像加速）。"
+  fi
+  export NETWORK_REGION
+}
+
+pick_option() {
+  # 编号选择：pick_option 变量名 "提示" 当前值 候选数组名
+  # 候选格式 "显示名|值"，另外总是提供「自定义填写」与「保持当前」。
+  local __name=$1 message=$2 current=$3 arr_name=$4
+  local -n choices=$arr_name
+  local i label value custom_index keep_index answer
+  bold "$message"
+  for i in "${!choices[@]}"; do
+    label=${choices[$i]%%|*}
+    value=${choices[$i]#*|}
+    if [[ "$value" == "$current" ]]; then
+      printf '  %d) %s  <- 当前\n' "$((i + 1))" "$label"
+    else
+      printf '  %d) %s\n' "$((i + 1))" "$label"
+    fi
+  done
+  custom_index=$(( ${#choices[@]} + 1 ))
+  keep_index=$(( ${#choices[@]} + 2 ))
+  printf '  %d) 自定义填写\n' "$custom_index"
+  printf '  %d) 保持当前值（%s）\n' "$keep_index" "${current:-空}"
+  while :; do
+    read -r -p "请选择 [${keep_index}]: " answer
+    answer=${answer:-$keep_index}
+    if [[ "$answer" == "$keep_index" ]]; then
+      return 0
+    elif [[ "$answer" == "$custom_index" ]]; then
+      read -r -p '请输入自定义值（留空表示不使用）: ' value
+      printf -v "$__name" '%s' "$value"
+      return 0
+    elif [[ "$answer" =~ ^[0-9]+$ ]] && ((answer >= 1 && answer <= ${#choices[@]})); then
+      value=${choices[$((answer - 1))]#*|}
+      printf -v "$__name" '%s' "$value"
+      return 0
+    fi
+    warn "请输入 1-${keep_index} 之间的编号。"
+  done
+}
+
+host_of_url() {
+  local url=${1#*://}
+  printf '%s\n' "${url%%/*}"
+}
+
 prompt_default() {
   # Enter keeps the default; a single "-" clears the value entirely.
   local __name=$1 message=$2 default=$3 value
@@ -258,6 +348,7 @@ write_config() {
     printf 'ONEBOT_HTTP_PORT=%q\n' "$ONEBOT_HTTP_PORT"
     printf 'GITHUB_PROXY=%q\n' "$GITHUB_PROXY"
     printf 'GITHUB_ACCESS=%q\n' "$GITHUB_ACCESS"
+    printf 'NETWORK_REGION=%q\n' "$NETWORK_REGION"
     printf 'GITHUB_MIRRORS=%q\n' "$GITHUB_MIRRORS"
     printf 'PIP_INDEX_URL=%q\n' "$PIP_INDEX_URL"
     printf 'PIP_TRUSTED_HOST=%q\n' "$PIP_TRUSTED_HOST"

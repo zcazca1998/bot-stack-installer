@@ -25,21 +25,30 @@
 
 ## 一键安装
 
+国内机器（脚本本身也走加速站）：
+
+~~~bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
+~~~
+
+海外机器（直连）：
+
 ~~~bash
 curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
 ~~~
 
-自动拉取源码（GitHub 加速站 → 直连逐级回退）并进入一键安装流程。想先看菜单：
+加速站不通时可换 `ghfast.top` 或 `ghproxy.net` 前缀。脚本会自己探测能否直连 GitHub，
+海外机器直接下载，国内机器逐个加速站回退，然后进入一键安装流程。想先看菜单：
 
 ~~~bash
-curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo NBOT_ARGS=menu bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo NBOT_ARGS=menu bash
 ~~~
 
 也可以手动克隆后运行：
 
 ~~~bash
+git clone https://github.com/zcazca1998/nbot.git
 cd nbot
-chmod +x install.sh
 sudo ./install.sh        # 首次；安装后任何目录直接 sudo nbot
 ~~~
 
@@ -122,11 +131,18 @@ nbot snowluma update
 
 ## 国内网络优化
 
-三条下载链路都有逐级回退，默认值对国内机器友好：
+首次运行基础配置时会**自动探测网络环境**（实测能否直连 GitHub 与 PyPI）：
 
-- **GitHub**：配置代理 → 加速站（ghfast.top、gh-proxy.com、ghproxy.net）→ 直连。加速站列表可在基础配置里改，留空则不用。
-- **容器镜像**：dockerproxy.net → docker.1ms.run → Docker Hub，已下载的 blob 会在切换源时复用。
-- **pip**（AstrBot 依赖数百 MB）：默认阿里云 PyPI 镜像，失败自动回退官方源。
+- 检测为海外机器 → 三条链路默认全部直连，不绕镜像。
+- 检测为国内机器 → 默认启用镜像加速，并可在配置里逐项选择。
+
+三条下载链路都有逐级回退：
+
+- **GitHub**：配置代理 → 加速站 → 直连。候选：gh-proxy.com、ghfast.top、ghproxy.net、全部依次尝试、不加速。
+- **容器镜像**：首选 → 备用 → Docker Hub，已下载的 blob 在切换源时复用。候选：dockerproxy.net、docker.1ms.run、m.daocloud.io/docker.io、docker.xuanyuan.me、不加速。
+- **pip**（AstrBot 依赖数百 MB）：镜像 → 失败自动回退官方源。候选：清华 TUNA（默认）、阿里云、腾讯云、中科大 USTC、华为云、官方 pypi.org。
+
+每一项都提供「自定义填写」，可以填任何自建或内网镜像；trusted-host 会自动从索引地址推导。
 
 GitHub 访问支持三种模式：
 

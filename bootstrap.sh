@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # nbot 一键安装引导：拉取仓库并进入安装流程。
+#
+# 国内（脚本本身也走加速站，推荐）：
+#   curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
+# 海外：
 #   curl -fsSL https://raw.githubusercontent.com/zcazca1998/nbot/main/bootstrap.sh | sudo bash
+#
 # 环境变量：
 #   NBOT_REPO_MIRRORS  逗号分隔的 GitHub 加速站，按序尝试（默认内置三个）
 #   NBOT_BRANCH        分支，默认 main
@@ -10,7 +15,7 @@ set -Eeuo pipefail
 REPO_PATH=zcazca1998/nbot
 BRANCH=${NBOT_BRANCH:-main}
 TARGET=/usr/local/lib/nbot/installer
-MIRRORS=${NBOT_REPO_MIRRORS:-https://ghfast.top,https://gh-proxy.com,https://ghproxy.net}
+MIRRORS=${NBOT_REPO_MIRRORS:-https://gh-proxy.com,https://ghfast.top,https://ghproxy.net}
 
 info() { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33m[WARN]\033[0m %s\n' "$*" >&2; }
@@ -32,23 +37,33 @@ trap 'rm -rf "$work"' EXIT
 archive="$work/nbot.tar.gz"
 direct="https://codeload.github.com/${REPO_PATH}/tar.gz/refs/heads/${BRANCH}"
 
-# 国内直连 GitHub 常年不通，先走加速站，最后直连。
 downloaded=0
-IFS=,
-for mirror in $MIRRORS; do
-  [[ -n "$mirror" ]] || continue
-  unset IFS
-  info "尝试加速站：${mirror%/}"
-  if curl -fsSL --connect-timeout 15 --retry 2 -o "$archive" "${mirror%/}/$direct"; then
+# 先探测能否快速直连 GitHub：海外机器直接下载，不必绕加速站。
+if curl -fsS --max-time 6 -o /dev/null https://api.github.com/ 2>/dev/null; then
+  info "可直连 GitHub，直接下载源码。"
+  if curl -fsSL --connect-timeout 15 --retry 2 -o "$archive" "$direct"; then
     downloaded=1
-    break
   fi
-  warn "加速站不可用：${mirror%/}"
-  IFS=,
-done
-unset IFS
+fi
+
+# 国内直连常年不通：逐个加速站尝试，最后再赌一次直连。
 if ((downloaded == 0)); then
-  info "尝试直连 GitHub"
+  IFS=,
+  for mirror in $MIRRORS; do
+    [[ -n "$mirror" ]] || continue
+    unset IFS
+    info "尝试加速站：${mirror%/}"
+    if curl -fsSL --connect-timeout 15 --retry 2 -o "$archive" "${mirror%/}/$direct"; then
+      downloaded=1
+      break
+    fi
+    warn "加速站不可用：${mirror%/}"
+    IFS=,
+  done
+  unset IFS
+fi
+if ((downloaded == 0)); then
+  info "最后尝试直连 GitHub"
   curl -fsSL --connect-timeout 20 --retry 2 -o "$archive" "$direct" ||
     die "无法下载 nbot 源码。请检查网络，或手动 git clone 后执行 sudo ./install.sh"
 fi

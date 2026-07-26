@@ -113,10 +113,21 @@ grep -q 'mirrored_github_url' "$ROOT/lib/common-base.sh"
 grep -q 'PIP_INDEX_URL' "$ROOT/lib/common-base.sh"
 grep -q 'index-url' "$ROOT/modules/astrbot.sh"
 grep -q '回退官方 PyPI' "$ROOT/modules/astrbot.sh"
-# One-line bootstrap installer.
+# One-line bootstrap installer, mirror-aware and region-aware.
 [[ -f "$ROOT/bootstrap.sh" ]]
 grep -q 'NBOT_ARGS:-install-all' "$ROOT/bootstrap.sh"
 grep -q '/dev/tty' "$ROOT/bootstrap.sh"
+grep -q 'api.github.com' "$ROOT/bootstrap.sh"
+grep -q 'gh-proxy.com' "$ROOT/bootstrap.sh"
+# Region detection plus numbered mirror menus with a custom-entry escape hatch.
+grep -q 'detect_network_region()' "$ROOT/lib/common-base.sh"
+grep -q 'pick_option()' "$ROOT/lib/common-base.sh"
+grep -q 'detect_network_region' "$ROOT/install-core.sh"
+grep -q 'PIP_MIRROR_CHOICES' "$ROOT/lib/common-base.sh"
+grep -q 'pypi.tuna.tsinghua.edu.cn' "$ROOT/lib/common-base.sh"
+grep -q 'mirrors.ustc.edu.cn' "$ROOT/lib/common-base.sh"
+grep -q '自定义填写' "$ROOT/lib/common-base.sh"
+grep -q 'NETWORK_REGION=%q' "$ROOT/lib/common-base.sh"
 # Every helper script must carry the executable bit in git (JS files are
 # invoked via node and are exempt).
 if [[ "$(uname -s)" == Linux ]]; then
