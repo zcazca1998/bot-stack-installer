@@ -12,12 +12,14 @@
 - Node 保留 cap_sys_ptrace=ep，以满足官方 Hook 要求。
 - 所有更新均手动触发，不启用定时自动更新。
 
-默认目录：
+默认目录（统一工作区，基础配置里可整体或单独自定义）：
 
-- AstrBot 数据：/AstrBot
-- SnowLuma 配置、缓存和 QQ 登录态：/snowluma
-- SnowLuma、QQ、Node 程序载荷：/AstrBot/.bot-stack/snowluma
+- 统一工作区：/bot-stack
+- AstrBot 数据：/bot-stack/astrbot
+- SnowLuma 配置、缓存和 QQ 登录态：/bot-stack/snowluma
+- SnowLuma、QQ、Node 程序载荷：/bot-stack/payload/snowluma
 - 系统盘只保存小型 unit、控制脚本和 /etc/bot-stack.conf
+- 旧版本装过的机器沿用 /etc/bot-stack.conf 里已保存的路径，不受新默认值影响
 
 拆镜像时载荷目录至少需要 6 GiB 可用空间。临时 OCI 层与 rootfs 会在成功或失败后清除。
 
@@ -29,12 +31,24 @@ chmod +x install.sh
 sudo ./install.sh
 ~~~
 
-无参数进入菜单。完整非交互命令：
+无参数进入交互菜单；推荐直接一键安装（配置 → AstrBot → SnowLuma+QQ → 服务与看门狗 → 可选 noVNC/Caddy → 输出总结与下一步指引）：
+
+~~~bash
+sudo ./install.sh install-all
+~~~
+
+也可分步执行：
 
 ~~~bash
 sudo ./install.sh install-snowluma
 sudo ./install.sh install-astrbot
 sudo ./install.sh repair
+~~~
+
+卸载（默认保留数据；删数据需要二次确认并输入 DELETE）：
+
+~~~bash
+sudo bot-stack uninstall
 ~~~
 
 安装器注册 bot-stack，后续可执行：

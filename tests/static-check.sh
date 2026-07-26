@@ -39,6 +39,13 @@ grep -q 'astrbot-prepare.*usr/local/lib/bot-stack/astrbot-prepare' "$ROOT/module
 grep -q "printf 'y" "$ROOT/assets/bin/astrbot-prepare"
 # Ubuntu 24.04 / Debian 13 renamed several libs with a t64 suffix.
 grep -q 't64' "$ROOT/lib/common-base.sh"
+# Unified workspace, one-shot install, and uninstall must exist.
+grep -q 'BOT_STACK_HOME' "$ROOT/lib/common-base.sh"
+grep -q 'BOT_STACK_HOME=%q' "$ROOT/lib/common-base.sh"
+grep -q 'install_all()' "$ROOT/install-core.sh"
+grep -q 'uninstall_stack()' "$ROOT/install-core.sh"
+# Data deletion must require typing DELETE explicitly.
+grep -q 'DELETE' "$ROOT/install-core.sh"
 grep -q 'python-build-standalone' "$ROOT/modules/astrbot.sh"
 grep -q 'release_id=.*RANDOM' "$ROOT/modules/snowluma.sh"
 

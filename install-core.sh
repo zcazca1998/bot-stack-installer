@@ -25,7 +25,14 @@ EOF
 }
 
 configure_base() {
+  local previous_home=$BOT_STACK_HOME
   bold "基础配置（回车保留默认值，输入 - 可清空该项）"
+  prompt_default BOT_STACK_HOME "统一工作区目录（各组件按名字放子目录）" "$BOT_STACK_HOME"
+  if [[ "$BOT_STACK_HOME" != "$previous_home" ]]; then
+    ASTRBOT_ROOT="${BOT_STACK_HOME}/astrbot"
+    SNOWLUMA_ROOT="${BOT_STACK_HOME}/snowluma"
+    SNOWLUMA_PAYLOAD_ROOT="${BOT_STACK_HOME}/payload/snowluma"
+  fi
   prompt_default ASTRBOT_ROOT "AstrBot 数据目录" "$ASTRBOT_ROOT"
   prompt_default SNOWLUMA_ROOT "SnowLuma 数据目录" "$SNOWLUMA_ROOT"
   prompt_default SNOWLUMA_PAYLOAD_ROOT "SnowLuma/QQ 程序载荷目录" "$SNOWLUMA_PAYLOAD_ROOT"
@@ -105,6 +112,73 @@ doctor() {
   return "$failed"
 }
 
+print_summary() {
+  local ip
+  ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+  ip=${ip:-服务器IP}
+  bold "安装完成"
+  info "AstrBot WebUI:  http://${ip}:${ASTRBOT_PORT}（默认账号/密码 astrbot/astrbot，请尽快修改）"
+  info "SnowLuma WebUI: http://${ip}:${SNOWLUMA_WEBUI_PORT}"
+  info "下一步："
+  info "  1) qqlogin                     # 扫码登录 QQ"
+  info "  2) bot-stack configure-onebot  # 生成 OneBot 配置并显示 token"
+  info "  3) 在 AstrBot WebUI 添加 OneBot v11 适配器（端口 ${ASTRBOT_WS_PORT} + 上一步的 token）"
+  info "常用命令：bot-stack status / doctor / logs；snowlumactl；astrbotctl；qqlogin --fresh"
+}
+
+install_all() {
+  configure_base
+  install_astrbot
+  install_snowluma
+  install_runtime_assets
+  install_astrbot_units
+  install_snowluma_units
+  if confirm "同时安装 noVNC 远程画面（浏览器查看 QQ 画面，可接 Caddy 反代）？" N; then
+    install_novnc
+  fi
+  print_summary
+}
+
+uninstall_stack() {
+  local unit path answer
+  bold "卸载 Bot Stack"
+  confirm "停止并移除所有 bot-stack 服务与程序？（数据目录默认保留）" N || return 0
+  for unit in astrbot-watchdog.timer snowluma-watchdog.timer snowluma-novnc.service \
+    snowluma-vnc.service snowluma.service snowluma-qq.service astrbot.service \
+    astrbot-watchdog.service snowluma-watchdog.service; do
+    systemctl stop "$unit" 2>/dev/null || true
+    systemctl disable "$unit" 2>/dev/null || true
+    rm -f "/etc/systemd/system/$unit"
+  done
+  if [[ -f /etc/systemd/system/caddy.service ]] &&
+     confirm "同时移除由安装器安装的 Caddy？" N; then
+    systemctl stop caddy.service 2>/dev/null || true
+    systemctl disable caddy.service 2>/dev/null || true
+    rm -f /etc/systemd/system/caddy.service /usr/local/bin/caddy
+    rm -f "$CADDY_CONF_DIR/conf.d/novnc.caddy"
+  fi
+  systemctl daemon-reload
+  rm -rf /usr/local/lib/bot-stack
+  rm -f /usr/local/bin/snowlumactl /usr/local/bin/qqlogin /usr/local/bin/qqrefresh \
+    /usr/local/bin/astrbotctl /usr/local/bin/novncctl /usr/local/sbin/bot-stack
+  info "服务与程序已移除。数据仍保留在："
+  info "  ${ASTRBOT_ROOT} / ${SNOWLUMA_ROOT} / ${SNOWLUMA_PAYLOAD_ROOT}"
+  if confirm "危险：连同数据一起删除（QQ 登录态、配置、聊天数据，不可恢复）？" N; then
+    read -r -p '确认删除请输入 DELETE： ' answer
+    if [[ "$answer" == DELETE ]]; then
+      for path in "$SNOWLUMA_PAYLOAD_ROOT" "$SNOWLUMA_ROOT" "$ASTRBOT_ROOT"; do
+        [[ -n "$path" && "$path" != / ]] && rm -rf "$path"
+      done
+      rm -f "$CONFIG_FILE"
+      id snowluma >/dev/null 2>&1 && userdel snowluma 2>/dev/null || true
+      info "数据已删除。"
+    else
+      warn "未输入 DELETE，数据保留。"
+    fi
+  fi
+  info "卸载完成。"
+}
+
 show_logs() {
   case "${1:-}" in
     astrbot) journalctl -u astrbot.service --no-pager ;;
@@ -120,6 +194,7 @@ menu() {
     cat <<'EOF'
 
 Bot Stack 安装管理
+  0) 一键安装全部（AstrBot + SnowLuma + QQ，可选 noVNC/Caddy）
   1) 基础配置（目录 / 端口 / 下载代理）
   2) 安装/更新 AstrBot
   3) 从官方镜像安装/更新 SnowLuma + QQ
@@ -130,10 +205,12 @@ Bot Stack 安装管理
   8) 环境诊断
   9) 安装/更新 noVNC 远程画面（供反向代理使用）
  10) 安装/配置 Caddy 反向代理（HTTPS + 登录）
-  0) 退出
+ 11) 卸载
+  q) 退出
 EOF
     read -r -p '请选择: ' choice
     case "$choice" in
+      0) install_all ;;
       1) configure_base ;;
       2) install_astrbot ;;
       3) install_snowluma ;;
@@ -144,8 +221,9 @@ EOF
       8) doctor || true ;;
       9) install_novnc ;;
       10) install_caddy ;;
-      0) return ;;
-      *) warn "无效选项，请输入 0-10。" ;;
+      11) uninstall_stack ;;
+      q|Q|exit|quit) return ;;
+      *) warn "无效选项，请输入 0-11 或 q 退出。" ;;
     esac
   done
 }
@@ -158,14 +236,8 @@ main() {
   case "${1:-menu}" in
     menu) menu ;;
     configure) configure_base ;;
-    install-all)
-      configure_base
-      install_astrbot
-      install_snowluma
-      install_runtime_assets
-      install_astrbot_units
-      install_snowluma_units
-      ;;
+    install-all) install_all ;;
+    uninstall) uninstall_stack ;;
     install-astrbot|update-astrbot) install_astrbot ;;
     install-snowluma|update-snowluma|install-qq|update-qq) install_snowluma ;;
     install-novnc|update-novnc) install_novnc ;;
@@ -181,7 +253,7 @@ main() {
     status) status_all ;;
     doctor) doctor ;;
     logs) show_logs "${2:-}" ;;
-    *) die "未知命令：$1（可用：menu configure install-all install-astrbot install-snowluma install-novnc install-caddy configure-onebot repair status doctor logs）" ;;
+    *) die "未知命令：$1（可用：menu configure install-all install-astrbot install-snowluma install-novnc install-caddy configure-onebot repair status doctor logs uninstall）" ;;
   esac
 }
 
