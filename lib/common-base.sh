@@ -21,6 +21,8 @@ SNOWLUMA_IMAGE_PROXY=${SNOWLUMA_IMAGE_PROXY:-}
 SNOWLUMA_PAYLOAD_ROOT=${SNOWLUMA_PAYLOAD_ROOT:-${BOT_STACK_HOME}/payload/snowluma}
 NOVNC_PORT=${NOVNC_PORT:-6080}
 NOVNC_VNC_PORT=${NOVNC_VNC_PORT:-5901}
+# journald 总量上限；留空表示不修改系统默认。
+JOURNALD_MAX_USE=${JOURNALD_MAX_USE:-}
 CADDY_DOMAIN=${CADDY_DOMAIN:-}
 CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT:-8443}
 CADDY_AUTH_USER=${CADDY_AUTH_USER:-admin}
@@ -222,6 +224,7 @@ write_config() {
     printf 'SNOWLUMA_PAYLOAD_ROOT=%q\n' "$SNOWLUMA_PAYLOAD_ROOT"
     printf 'NOVNC_PORT=%q\n' "$NOVNC_PORT"
     printf 'NOVNC_VNC_PORT=%q\n' "$NOVNC_VNC_PORT"
+    printf 'JOURNALD_MAX_USE=%q\n' "$JOURNALD_MAX_USE"
     printf 'CADDY_DOMAIN=%q\n' "$CADDY_DOMAIN"
     printf 'CADDY_HTTPS_PORT=%q\n' "$CADDY_HTTPS_PORT"
     printf 'CADDY_AUTH_USER=%q\n' "$CADDY_AUTH_USER"
@@ -251,6 +254,52 @@ find_python() {
     fi
   done
   return 1
+}
+
+write_logrotate_config() {
+  # 按大小 + 天数轮转应用自有日志文件；journald 部分由 SystemMaxUse 兜底。
+  # snowluma 用户还不存在时（仅装 AstrBot）跳过对应段，避免 logrotate 报错。
+  {
+    if id snowluma >/dev/null 2>&1; then
+      cat <<EOF
+${SNOWLUMA_ROOT}/logs/*.log {
+    su snowluma snowluma
+    daily
+    rotate 7
+    maxsize 20M
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+    fi
+    cat <<EOF
+${ASTRBOT_ROOT}/data/logs/*.log {
+    daily
+    rotate 7
+    maxsize 20M
+    compress
+    missingok
+    notifempty
+    copytruncate
+}
+EOF
+  } > /etc/logrotate.d/bot-stack
+  chmod 0644 /etc/logrotate.d/bot-stack
+}
+
+write_journald_limit() {
+  local dropin=/etc/systemd/journald.conf.d/bot-stack.conf content
+  [[ -n "$JOURNALD_MAX_USE" ]] || return 0
+  content="[Journal]
+SystemMaxUse=${JOURNALD_MAX_USE}"
+  if [[ ! -f "$dropin" ]] || [[ $(<"$dropin") != "$content" ]]; then
+    mkdir -p /etc/systemd/journald.conf.d
+    printf '%s\n' "$content" > "$dropin"
+    systemctl restart systemd-journald 2>/dev/null || true
+    info "journald 总量上限已设置为 ${JOURNALD_MAX_USE}。"
+  fi
 }
 
 wait_http() {

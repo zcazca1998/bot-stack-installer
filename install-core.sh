@@ -62,6 +62,7 @@ configure_base() {
   prompt_default SNOWLUMA_IMAGE_MIRROR "容器镜像加速前缀（输入 - 清空表示仅直连）" "$SNOWLUMA_IMAGE_MIRROR"
   prompt_default SNOWLUMA_IMAGE_FALLBACK_MIRROR "备用镜像加速前缀（输入 - 清空）" "$SNOWLUMA_IMAGE_FALLBACK_MIRROR"
   prompt_default SNOWLUMA_IMAGE_PROXY "镜像下载代理（可选，输入 - 清空）" "${SNOWLUMA_IMAGE_PROXY:-$GITHUB_PROXY}"
+  prompt_default JOURNALD_MAX_USE "journald 系统日志总量上限（如 500M；输入 - 表示不修改系统默认）" "${JOURNALD_MAX_USE:-500M}"
 
   write_config
   info "配置已写入 $CONFIG_FILE"
@@ -143,9 +144,10 @@ uninstall_stack() {
   local unit path answer
   bold "卸载 Bot Stack"
   confirm "停止并移除所有 bot-stack 服务与程序？（数据目录默认保留）" N || return 0
-  for unit in astrbot-watchdog.timer snowluma-watchdog.timer snowluma-novnc.service \
-    snowluma-vnc.service snowluma.service snowluma-qq.service astrbot.service \
-    astrbot-watchdog.service snowluma-watchdog.service; do
+  for unit in astrbot-watchdog.timer snowluma-watchdog.timer bot-stack-logclean.timer \
+    snowluma-novnc.service snowluma-vnc.service snowluma.service snowluma-qq.service \
+    astrbot.service astrbot-watchdog.service snowluma-watchdog.service \
+    bot-stack-logclean.service; do
     systemctl stop "$unit" 2>/dev/null || true
     systemctl disable "$unit" 2>/dev/null || true
     rm -f "/etc/systemd/system/$unit"
@@ -161,6 +163,11 @@ uninstall_stack() {
   rm -rf /usr/local/lib/bot-stack
   rm -f /usr/local/bin/snowlumactl /usr/local/bin/qqlogin /usr/local/bin/qqrefresh \
     /usr/local/bin/astrbotctl /usr/local/bin/novncctl /usr/local/sbin/bot-stack
+  rm -f /etc/logrotate.d/bot-stack
+  if [[ -f /etc/systemd/journald.conf.d/bot-stack.conf ]]; then
+    rm -f /etc/systemd/journald.conf.d/bot-stack.conf
+    systemctl restart systemd-journald 2>/dev/null || true
+  fi
   info "服务与程序已移除。数据仍保留在："
   info "  ${ASTRBOT_ROOT} / ${SNOWLUMA_ROOT} / ${SNOWLUMA_PAYLOAD_ROOT}"
   if confirm "危险：连同数据一起删除（QQ 登录态、配置、聊天数据，不可恢复）？" N; then
@@ -177,6 +184,43 @@ uninstall_stack() {
     fi
   fi
   info "卸载完成。"
+}
+
+show_help() {
+  cat <<'EOF'
+Bot Stack 安装管理器
+用法：bot-stack <命令>        （无参数进入交互菜单）
+
+安装与配置
+  install-all        一键安装全部（推荐：配置 -> AstrBot -> SnowLuma+QQ -> 可选 noVNC/Caddy）
+  install-astrbot    安装/更新 AstrBot
+  install-snowluma   安装/更新 SnowLuma + QQ（拆官方镜像，不装 Docker）
+  install-novnc      安装 noVNC 远程画面（浏览器看 QQ 桌面）
+  install-caddy      安装/配置 Caddy 反向代理（HTTPS + 登录）
+  configure          基础配置（工作区/端口/代理/日志上限）
+  configure-onebot   配置 OneBot 对接 AstrBot（会显示 token）
+  repair             重装服务、看门狗、控制脚本与日志轮转
+  uninstall          卸载（默认保留数据；删数据需输入 DELETE）
+
+状态与日志
+  status             全部服务状态总览
+  doctor             环境诊断（挂载、端口、WebUI 探活）
+  logs astrbot       AstrBot 完整日志
+  logs snowluma      SnowLuma + QQ 日志
+  logs watchdog      看门狗动作记录
+  跟踪模式：astrbotctl logs -f / snowlumactl logs -f / novncctl logs -f
+  最近 N 行：astrbotctl logs -n 200（snowlumactl/novncctl 同理）
+
+QQ 登录
+  qqlogin            终端扫码登录
+  qqlogin --fresh    被踢下线/登录过期后强制重新扫码
+  qqrefresh          手动点击刷新二维码
+  snowlumactl qq-status   查询 QQ 在线状态
+
+日志占用限制（自动启用）
+  应用日志由 logrotate 按 20M/7 天轮转；QQ 日志与崩溃转储每日清理（保留 7 天）；
+  journald 总量上限在基础配置中设置（默认建议 500M）。
+EOF
 }
 
 show_logs() {
@@ -253,7 +297,8 @@ main() {
     status) status_all ;;
     doctor) doctor ;;
     logs) show_logs "${2:-}" ;;
-    *) die "未知命令：$1（可用：menu configure install-all install-astrbot install-snowluma install-novnc install-caddy configure-onebot repair status doctor logs uninstall）" ;;
+    help|-h|--help) show_help ;;
+    *) warn "未知命令：$1"; show_help; exit 1 ;;
   esac
 }
 

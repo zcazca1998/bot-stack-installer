@@ -46,6 +46,17 @@ grep -q 'install_all()' "$ROOT/install-core.sh"
 grep -q 'uninstall_stack()' "$ROOT/install-core.sh"
 # Data deletion must require typing DELETE explicitly.
 grep -q 'DELETE' "$ROOT/install-core.sh"
+
+# Log limits: logrotate, daily pruning timer, optional journald cap, help.
+grep -q 'logrotate.d/bot-stack' "$ROOT/lib/common-base.sh"
+grep -q 'SystemMaxUse' "$ROOT/lib/common-base.sh"
+[[ -f "$ROOT/assets/bin/bot-stack-logclean" ]]
+[[ -f "$ROOT/assets/systemd/bot-stack-logclean.timer" ]]
+grep -q 'bot-stack-logclean' "$ROOT/modules/snowluma.sh"
+grep -q 'show_help()' "$ROOT/install-core.sh"
+# Uninstall must remove the logrotate and journald drop-ins.
+grep -q 'rm -f /etc/logrotate.d/bot-stack' "$ROOT/install-core.sh"
+grep -q 'journald.conf.d/bot-stack.conf' "$ROOT/install-core.sh"
 grep -q 'python-build-standalone' "$ROOT/modules/astrbot.sh"
 grep -q 'release_id=.*RANDOM' "$ROOT/modules/snowluma.sh"
 

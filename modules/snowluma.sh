@@ -10,6 +10,13 @@ install_runtime_assets() {
   for file in snowlumactl qqlogin qqrefresh astrbotctl novncctl; do
     install -m 0755 "$SCRIPT_DIR/assets/bin/$file" "/usr/local/bin/$file"
   done
+  # 日志限制：logrotate 轮转 + 每日清理定时器 + 可选 journald 总量上限。
+  install -m 0644 "$SCRIPT_DIR/assets/systemd/bot-stack-logclean.service" /etc/systemd/system/bot-stack-logclean.service
+  install -m 0644 "$SCRIPT_DIR/assets/systemd/bot-stack-logclean.timer" /etc/systemd/system/bot-stack-logclean.timer
+  write_logrotate_config
+  write_journald_limit
+  systemctl daemon-reload
+  systemctl enable --now bot-stack-logclean.timer >/dev/null 2>&1 || true
 }
 
 normalized_image_ref() {
