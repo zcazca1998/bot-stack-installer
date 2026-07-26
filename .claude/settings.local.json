@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(wsl.exe --list --verbose)",
-      "Bash(echo \"EXIT:$?\")",
-      "Bash(bash -x tests/common-check.sh)"
-    ]
-  }
-}
