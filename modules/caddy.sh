@@ -105,7 +105,7 @@ EOF
 
 set_caddy_auth() {
   # 只改账号密码，不动域名、端口和证书配置。
-  local site_file password confirm_password hash tls_line='' site
+  local site_file password confirm_password hash tls_line='' site verify_url code
   site_file=$(caddy_site_file)
   [[ -f "$site_file" ]] ||
     die "尚未配置 Caddy，请先执行 nbot install-caddy。"
@@ -139,10 +139,23 @@ set_caddy_auth() {
   write_caddy_site "$site" "$CADDY_AUTH_USER" "$hash" "$tls_line"
   caddy validate --config "$CADDY_CONF_DIR/Caddyfile" >/dev/null 2>&1 ||
     die "Caddyfile 校验失败，配置未生效。"
-  systemctl reload caddy.service 2>/dev/null ||
+  if ! systemctl reload caddy.service 2>/dev/null; then
     restart_service caddy.service
-  info "登录账号：${CADDY_AUTH_USER}  密码：${password}"
-  warn "密码仅显示这一次，请立即保存。"
+  fi
+  if [[ -n "$CADDY_DOMAIN" ]]; then
+    verify_url="https://${CADDY_DOMAIN}/novnc/vnc.html"
+  else
+    verify_url="https://127.0.0.1:${CADDY_HTTPS_PORT}/novnc/vnc.html"
+  fi
+  code=$(curl -ks -o /dev/null -w '%{http_code}' --max-time 8 \
+    -u "${CADDY_AUTH_USER}:${password}" "$verify_url" || true)
+  if [[ "$code" == 200 ]]; then
+    info "登录账号：${CADDY_AUTH_USER}  密码：${password}"
+    warn "密码仅显示这一次，请立即保存。"
+  else
+    warn "密码设置后验证失败（HTTP ${code:-无响应}），密码可能未生效。"
+    info "登录账号：${CADDY_AUTH_USER}  密码：${password}"
+  fi
 }
 
 install_caddy() {
